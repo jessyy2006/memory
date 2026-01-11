@@ -56,6 +56,10 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+    if #available(iOS 17.0, *) {
+        ContentView()
+            .modelContainer(for: Item.self, inMemory: true)
+    } else {
+        // Fallback on earlier versions
+    }
 }

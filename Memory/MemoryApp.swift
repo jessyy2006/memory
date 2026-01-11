@@ -10,9 +10,13 @@ import SwiftData
 
 @main
 struct MemoryApp: App {
+    @State private var authService = AuthenticationService()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            User.self,
+            Memory.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +29,13 @@ struct MemoryApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if authService.isAuthenticated {
+                MemoriesHomeView()
+                    .environment(authService)
+            } else {
+                CreateAccountView()
+                    .environment(authService)
+            }
         }
         .modelContainer(sharedModelContainer)
     }

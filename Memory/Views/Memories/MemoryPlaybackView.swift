@@ -12,6 +12,7 @@ struct MemoryPlaybackView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventName: String? // Optional event name
 
     @State private var showDeleteConfirmation = false
     @State private var memoryToDelete: Memory?
@@ -58,8 +59,9 @@ struct MemoryPlaybackView: View {
         }
         .onAppear {
             print("📺 MemoryPlaybackView appeared with \(memoryService.memories.count) memories")
+            print("📺 Event name: \(eventName ?? "none")")
         }
-        .navigationTitle("Your Memories")
+        .navigationTitle(eventName ?? "Your Memories")
         .navigationBarTitleDisplayMode(.large)
         .refreshable {
             await memoryService.syncMemories(userId: userId)
@@ -86,7 +88,8 @@ struct MemoryPlaybackView: View {
     return NavigationStack {
         MemoryPlaybackView(
             memoryService: MemoryService(modelContext: modelContext),
-            userId: UUID()
+            userId: UUID(),
+            eventName: "Test Event"
         )
     }
 }

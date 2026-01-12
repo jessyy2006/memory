@@ -189,7 +189,8 @@ struct MemoriesHomeView: View {
                        let userId = authService.currentUserId {
                         MemoryPlaybackView(
                             memoryService: service,
-                            userId: userId
+                            userId: userId,
+                            eventName: activeEvent?.name
                         )
                         .onAppear {
                             print("✅ Navigating to playback with \(service.memories.count) memories")

@@ -195,13 +195,23 @@ struct EventRecord: Codable, Hashable {
         updatedAt = updated
     }
 
-    /// Returns true if the event has ended (based on end_time or event_date)
+    /// Returns true if the event has ended
+    /// An event is considered "ended" if:
+    /// 1. Its date/time has passed, OR
+    /// 2. It was manually stopped (not active AND not the upcoming event)
     var isEnded: Bool {
+        // An event is ended if it's not active and not upcoming
+        // When you "End Event", the database sets is_active=false and updates is_upcoming
+        // So any event where both are false/nil is considered ended
+        if !isActive && (isUpcoming == nil || isUpcoming == false) {
+            return true
+        }
+
+        // Also check if event's date/time has passed
         let now = Date()
         let calendar = Calendar.current
 
         if let endTime = endTime {
-            // Combine event date + end time
             let eventDay = calendar.startOfDay(for: eventDate)
             let endHour = calendar.component(.hour, from: endTime)
             let endMinute = calendar.component(.minute, from: endTime)
@@ -212,7 +222,6 @@ struct EventRecord: Codable, Hashable {
 
             return eventEndDateTime < now
         } else {
-            // No end time - use date-only comparison
             return calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now)
         }
     }

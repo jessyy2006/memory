@@ -30,18 +30,17 @@ struct MemoriesHomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(.systemBackground),
-                        Color(.systemGray6)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(.systemBackground),
+                    Color(.systemGray6)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
                 VStack(spacing: 40) {
                     // Active Event Badge
@@ -153,10 +152,10 @@ struct MemoriesHomeView: View {
                     .padding(.bottom, 50)
                     .disabled(memoryService?.memories.isEmpty ?? true)
                     .opacity((memoryService?.memories.isEmpty ?? true) ? 0.5 : 1.0)
-                }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
                 // Only show toolbar buttons if NOT a past event
                 if !isPastEvent {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -227,9 +226,8 @@ struct MemoriesHomeView: View {
                     )
                 }
             }
-            .onAppear {
-                setupMemoryService()
-            }
+        .onAppear {
+            setupMemoryService()
         }
     }
 
@@ -328,10 +326,7 @@ struct MemoriesHomeView: View {
             _ = try await eventService.stopEvent(eventId: active.id)
             print("✅ [MemoriesHomeView] Event stopped successfully")
 
-            // Reload events to update state
-            await loadEvents()
-
-            // Navigate to playback
+            // Navigate to playback with the event name
             await MainActor.run {
                 print("🎬 [MemoriesHomeView] Navigating to playback screen...")
                 navigateToPlayback = true

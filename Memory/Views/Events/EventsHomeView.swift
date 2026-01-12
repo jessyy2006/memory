@@ -235,6 +235,15 @@ struct EventsHomeView: View {
                     await loadEvents()
                 }
             }
+            .onChange(of: navigateToMemories) { oldValue, newValue in
+                // Reload events when coming back from MemoriesHomeView
+                if oldValue != nil && newValue == nil {
+                    print("🔄 [EventsHomeView] Returned from MemoriesHomeView, reloading events...")
+                    Task {
+                        await loadEvents()
+                    }
+                }
+            }
         }
     }
 

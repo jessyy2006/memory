@@ -30,7 +30,24 @@ struct MemoryApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if authService.isAuthenticated {
+            if authService.isCheckingSession {
+                // Show loading screen while checking for existing session
+                ZStack {
+                    Color(.systemBackground)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .onAppear {
+                    print("⏳ [MemoryApp] Checking for existing session...")
+                }
+            } else if authService.isAuthenticated {
                 EventsHomeView()
                     .environment(authService)
                     .onAppear {

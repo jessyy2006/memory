@@ -42,6 +42,7 @@ enum AuthError: LocalizedError {
 class AuthenticationService {
     var currentUser: User?
     var isAuthenticated = false
+    var isCheckingSession = true // Add loading state
 
     private let supabase = SupabaseManager.shared
     private var currentNonce: String?
@@ -61,6 +62,10 @@ class AuthenticationService {
 
     @MainActor
     private func restoreSession() async {
+        defer {
+            isCheckingSession = false // Always set to false when done
+        }
+
         do {
             print("🔄 Checking for existing session...")
 

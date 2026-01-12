@@ -16,6 +16,7 @@ struct MemoryPlaybackView: View {
 
     @State private var showDeleteConfirmation = false
     @State private var memoryToDelete: Memory?
+    @State private var dismissCount = 0
 
     var body: some View {
         ScrollView {
@@ -63,6 +64,23 @@ struct MemoryPlaybackView: View {
         }
         .navigationTitle(eventName ?? "Your Memories")
         .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    // Dismiss twice to go back to EventsHomeView
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismiss()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Events")
+                    }
+                }
+            }
+        }
         .refreshable {
             await memoryService.syncMemories(userId: userId)
         }

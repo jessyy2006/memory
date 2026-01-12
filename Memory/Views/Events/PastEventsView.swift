@@ -6,17 +6,20 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct PastEventsView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(AuthenticationService.self) private var authService
     private let eventService = EventService()
 
     @State private var pastEvents: [EventRecord] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var memoryService: MemoryService?
 
-    // Navigation
-    @State private var navigateToMemories: EventRecord?
+    // Navigation - navigate directly to playback for past events
+    @State private var navigateToPlayback: EventRecord?
 
     var body: some View {
         ZStack {
@@ -80,7 +83,7 @@ struct PastEventsView: View {
                                 PastEventCard(
                                     event: event,
                                     onTap: {
-                                        navigateToMemories = event
+                                        navigateToPlayback = event
                                     }
                                 )
                                 .padding(.horizontal, 20)
@@ -95,12 +98,38 @@ struct PastEventsView: View {
         }
         .navigationTitle("Past Events")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $navigateToMemories) { event in
-            MemoriesHomeView(selectedEvent: event)
+        .navigationDestination(item: $navigateToPlayback) { event in
+            // Navigate directly to playback for past events
+            Group {
+                if let service = memoryService,
+                   let userId = authService.currentUserId {
+                    MemoryPlaybackView(
+                        memoryService: service,
+                        userId: userId,
+                        eventName: event.name
+                    )
+                    .onAppear {
+                        print("✅ [PastEventsView] Navigating to playback for past event: \(event.name)")
+                    }
+                } else {
+                    Text("Error: Unable to load memories")
+                        .foregroundColor(.red)
+                }
+            }
         }
         .onAppear {
+            // Initialize memory service
+            if memoryService == nil {
+                memoryService = MemoryService(modelContext: modelContext)
+            }
+
             Task {
                 await loadPastEvents()
+
+                // Load memories for the service
+                if let userId = authService.currentUserId {
+                    await memoryService?.syncMemories(userId: userId)
+                }
             }
         }
     }

@@ -19,12 +19,14 @@ struct MemoriesHomeView: View {
     // Event management
     private let eventService = EventService()
     let selectedEvent: EventRecord? // Event passed from EventsHomeView
+    let isPastEvent: Bool // Flag to indicate if this is a past event (disables Add/End actions)
     @State private var activeEvent: EventRecord?
     @State private var upcomingEvents: [EventRecord] = []
     @State private var showEventCreation = false
 
-    init(selectedEvent: EventRecord? = nil) {
+    init(selectedEvent: EventRecord? = nil, isPastEvent: Bool = false) {
         self.selectedEvent = selectedEvent
+        self.isPastEvent = isPastEvent
     }
 
     var body: some View {
@@ -86,34 +88,36 @@ struct MemoriesHomeView: View {
 
                     Spacer()
 
-                    // Circular Add Memories Button
-                    Button(action: {
-                        showMediaTypePicker = true
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.blue, .purple]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                    // Circular Add Memories Button (hidden for past events)
+                    if !isPastEvent {
+                        Button(action: {
+                            showMediaTypePicker = true
+                        }) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [.blue, .purple]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .frame(width: 200, height: 200)
-                                .shadow(color: .blue.opacity(0.4), radius: 20, x: 0, y: 10)
+                                    .frame(width: 200, height: 200)
+                                    .shadow(color: .blue.opacity(0.4), radius: 20, x: 0, y: 10)
 
-                            VStack(spacing: 12) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.white)
+                                VStack(spacing: 12) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 60))
+                                        .foregroundColor(.white)
 
-                                Text("Add Memories")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
+                                    Text("Add Memories")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                }
                             }
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .buttonStyle(ScaleButtonStyle())
 
                     Spacer()
 
@@ -153,24 +157,27 @@ struct MemoriesHomeView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if activeEvent != nil {
-                        // Show "End Event" button when event is active
-                        Button {
-                            Task {
-                                await endEventAndNavigateToPlayback()
+                // Only show toolbar buttons if NOT a past event
+                if !isPastEvent {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        if activeEvent != nil {
+                            // Show "End Event" button when event is active
+                            Button {
+                                Task {
+                                    await endEventAndNavigateToPlayback()
+                                }
+                            } label: {
+                                Text("End Event")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
                             }
-                        } label: {
-                            Text("End Event")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                        }
-                    } else {
-                        // Show schedule icon when no event is active
-                        Button {
-                            showEventCreation = true
-                        } label: {
-                            Image(systemName: "calendar.badge.plus")
+                        } else {
+                            // Show schedule icon when no event is active
+                            Button {
+                                showEventCreation = true
+                            } label: {
+                                Image(systemName: "calendar.badge.plus")
+                            }
                         }
                     }
                 }

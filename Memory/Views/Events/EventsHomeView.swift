@@ -128,36 +128,41 @@ struct EventsHomeView: View {
                                     .padding(.horizontal, 20)
                                 }
 
-                                // Past Events Button
-                                if !pastEvents.isEmpty {
-                                    Button {
-                                        navigateToPastEvents = true
-                                    } label: {
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text("Past Events")
-                                                    .font(.headline)
-                                                    .foregroundColor(.primary)
-                                                Text("\(pastEvents.count) ended event\(pastEvents.count == 1 ? "" : "s")")
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .padding()
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(12)
-                                    }
-                                    .padding(.horizontal, 20)
-                                    .padding(.top, 8)
-                                }
-
                                 // Add some bottom padding
                                 Color.clear.frame(height: 80)
                             }
                         }
+                    }
+                }
+
+                // Past Events Button (fixed to bottom with 32px padding)
+                if !pastEvents.isEmpty {
+                    VStack {
+                        Spacer()
+                        Button {
+                            navigateToPastEvents = true
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Past Events")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                    Text("\(pastEvents.count) ended event\(pastEvents.count == 1 ? "" : "s")")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 32)
                     }
                 }
             }

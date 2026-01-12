@@ -21,6 +21,10 @@ struct EventsHomeView: View {
     @State private var eventToStart: EventRecord?
     @State private var showStartConfirmation = false
 
+    // Error alert states
+    @State private var showMultipleEventsAlert = false
+    @State private var showNotUpcomingAlert = false
+
     // Navigation
     @State private var navigateToMemories: EventRecord?
 
@@ -169,6 +173,16 @@ struct EventsHomeView: View {
                     Text("Do you want to start '\(event.name)'?")
                 }
             }
+            .alert("Can't Start Multiple Events", isPresented: $showMultipleEventsAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Can't start multiple events at the same time.")
+            }
+            .alert("Patience!", isPresented: $showNotUpcomingAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You have other events to go to first")
+            }
             .onAppear {
                 print("👁️ [EventsHomeView] View appeared!")
                 print("👁️ [EventsHomeView] Current user ID: \(authService.currentUserId?.uuidString ?? "nil")")
@@ -191,7 +205,21 @@ struct EventsHomeView: View {
             // Just navigate to memories anyway
             navigateToMemories = event
         } else {
-            // Inactive event - show confirmation
+            // Inactive event - validate before showing confirmation
+
+            // Check 1: Is there already an active event?
+            if activeEvent != nil {
+                showMultipleEventsAlert = true
+                return
+            }
+
+            // Check 2: Is this event NOT the most upcoming one?
+            if event.isUpcoming == false {
+                showNotUpcomingAlert = true
+                return
+            }
+
+            // All validations passed - show confirmation
             eventToStart = event
             showStartConfirmation = true
         }

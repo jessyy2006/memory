@@ -13,6 +13,7 @@ struct AudioRecorderView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID?
     let onComplete: () -> Void
 
     @StateObject private var audioRecorder = AudioRecorder()
@@ -174,7 +175,7 @@ struct AudioRecorderView: View {
         isProcessing = true
         Task {
             do {
-                try await memoryService.createAudioMemory(userId: userId, audioURL: url)
+                try await memoryService.createAudioMemory(userId: userId, audioURL: url, eventId: eventId)
                 await MainActor.run {
                     audioRecorder.cleanup()
                     isProcessing = false

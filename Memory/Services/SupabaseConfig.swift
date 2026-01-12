@@ -20,6 +20,20 @@ struct SupabaseConfig {
         static let users = "users"
         static let profiles = "profiles"
         static let memories = "memories"
+        static let events = "events"
+    }
+
+    // MARK: - Database Views
+    struct Views {
+        static let memoriesWithEvents = "memories_with_events"
+    }
+
+    // MARK: - Stored Procedures
+    struct Functions {
+        static let getMostUpcomingEvent = "get_most_upcoming_event"
+        static let startEvent = "start_event"
+        static let stopEvent = "stop_event"
+        static let getEventsSorted = "get_events_sorted"
     }
 }
 

@@ -154,6 +154,13 @@ class SupabaseManager {
         return session.user
     }
 
+    /// Get current user ID as UUID (throws if there's no active session).
+    /// Use this method when you only need the user ID and don't want to import Auth module.
+    func getCurrentUserId() async throws -> UUID {
+        let session = try await client.auth.session
+        return session.user.id
+    }
+
     // MARK: - Database Operations
 
     func updateUserProfile(
@@ -328,21 +335,39 @@ class SupabaseManager {
     func deleteAvatar(userId: UUID) async throws {
         let fileName = "\(userId.uuidString).jpg"
 
-        try await client.storage
-            .from("avatars")
-            .remove(paths: [fileName])
+        do {
+            try await client.storage
+                .from("avatars")
+                .remove(paths: [fileName])
+            print("✅ Avatar deleted: \(fileName)")
+        } catch {
+            print("⚠️ Failed to delete avatar: \(error.localizedDescription)")
+            // Don't throw - avatar might not exist
+        }
     }
 
     // MARK: - Verification
 
     func resendVerificationEmail(email: String) async throws {
-        try await client.auth.resend(email: email, type: .signup)
-        print("✅ Verification email resent to: \(email)")
+        print("📧 Resending verification email to: \(email)")
+        do {
+            try await client.auth.resend(email: email, type: .signup)
+            print("✅ Verification email resent to: \(email)")
+        } catch {
+            print("❌ Failed to resend email: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     func resendVerificationSMS(phone: String) async throws {
-        try await client.auth.resend(phone: phone, type: .sms)
-        print("✅ Verification SMS resent to: \(phone)")
+        print("📱 Resending verification SMS to: \(phone)")
+        do {
+            try await client.auth.resend(phone: phone, type: .sms)
+            print("✅ Verification SMS resent to: \(phone)")
+        } catch {
+            print("❌ Failed to resend SMS: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     // MARK: - Memory Operations

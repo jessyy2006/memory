@@ -12,6 +12,7 @@ struct ImagePickerView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID?
     let onComplete: () -> Void
 
     @State private var selectedItem: PhotosPickerItem?
@@ -136,7 +137,7 @@ struct ImagePickerView: View {
         isProcessing = true
         Task {
             do {
-                try await memoryService.createPhotoMemory(userId: userId, imageData: imageData)
+                try await memoryService.createPhotoMemory(userId: userId, imageData: imageData, eventId: eventId)
                 await MainActor.run {
                     isProcessing = false
                     onComplete()

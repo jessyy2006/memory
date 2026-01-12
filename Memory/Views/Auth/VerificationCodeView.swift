@@ -12,6 +12,7 @@ struct VerificationCodeView: View {
     let user: User
     let contactMethod: String
     let isEmail: Bool
+    let onVerificationSuccess: () -> Void
 
     @State private var verificationCode = ""
     @State private var isVerifying = false
@@ -19,7 +20,6 @@ struct VerificationCodeView: View {
     @State private var isResending = false
     @State private var canResend = true
     @State private var remainingSeconds = 0
-    @State private var showProfileCompletion = false
     @FocusState private var isTextFieldFocused: Bool
     @Environment(\.dismiss) private var dismiss
 
@@ -127,9 +127,6 @@ struct VerificationCodeView: View {
         }
         .padding(.horizontal, 24)
         .navigationBarBackButtonHidden(false)
-        .navigationDestination(isPresented: $showProfileCompletion) {
-            ProfileCompletionView(authService: authService, user: user)
-        }
         .onAppear {
             // Focus the hidden text field to show keyboard
             isTextFieldFocused = true
@@ -145,26 +142,40 @@ struct VerificationCodeView: View {
     private func verifyCode() {
         guard verificationCode.count == codeLength else { return }
 
-        Task {
+        print("🔐 Starting verification with code: \(verificationCode)")
+
+        Task { @MainActor in
             isVerifying = true
-            defer { isVerifying = false }
+            defer {
+                isVerifying = false
+                print("🔐 isVerifying set to false")
+            }
 
             do {
+                print("🔐 Calling authService.verifyCode...")
                 let success = try await authService.verifyCode(
                     verificationCode,
                     for: user,
                     isEmail: isEmail
                 )
 
+                print("🔐 Verification result: \(success)")
+
                 if success {
                     // Successfully verified - navigate to profile completion
-                    showProfileCompletion = true
+                    print("✅ Verification successful! Triggering navigation callback...")
+                    onVerificationSuccess()
+                    print("✅ Navigation callback triggered")
+                } else {
+                    print("❌ Verification returned false")
                 }
             } catch let error as AuthError {
+                print("❌ AuthError during verification: \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
                 // Clear the code so user can try again
                 verificationCode = ""
             } catch {
+                print("❌ Unknown error during verification: \(error.localizedDescription)")
                 errorMessage = "Verification failed. Please try again."
                 verificationCode = ""
             }
@@ -172,22 +183,31 @@ struct VerificationCodeView: View {
     }
 
     private func resendCode() {
-        Task {
+        print("🔄 Resend code button tapped")
+        print("🔄 Contact: \(contactMethod), isEmail: \(isEmail)")
+
+        Task { @MainActor in
             isResending = true
             canResend = false
-            defer { isResending = false }
+            defer {
+                isResending = false
+                print("🔄 Resend operation completed")
+            }
 
             do {
+                print("🔄 Calling authService.sendVerificationCode...")
                 try await authService.sendVerificationCode(
                     to: contactMethod,
                     isEmail: isEmail
                 )
 
+                print("✅ Verification code resent successfully")
                 // Start countdown
                 remainingSeconds = 60
                 startResendTimer()
 
             } catch {
+                print("❌ Failed to resend: \(error.localizedDescription)")
                 errorMessage = "Failed to resend code. Please try again."
                 canResend = true
             }
@@ -234,7 +254,10 @@ struct VerificationDigitBox: View {
             authService: authService,
             user: User(email: "test@example.com"),
             contactMethod: "test@example.com",
-            isEmail: true
+            isEmail: true,
+            onVerificationSuccess: {
+                print("Verification successful in preview")
+            }
         )
     }
 }

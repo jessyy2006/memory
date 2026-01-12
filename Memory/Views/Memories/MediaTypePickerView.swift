@@ -12,6 +12,7 @@ struct MediaTypePickerView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID?
 
     @State private var showImagePicker = false
     @State private var showVideoPicker = false
@@ -80,22 +81,22 @@ struct MediaTypePickerView: View {
                 }
             }
             .sheet(isPresented: $showImagePicker) {
-                ImagePickerView(memoryService: memoryService, userId: userId) {
+                ImagePickerView(memoryService: memoryService, userId: userId, eventId: eventId) {
                     dismiss()
                 }
             }
             .sheet(isPresented: $showVideoPicker) {
-                VideoPickerView(memoryService: memoryService, userId: userId) {
+                VideoPickerView(memoryService: memoryService, userId: userId, eventId: eventId) {
                     dismiss()
                 }
             }
             .sheet(isPresented: $showNoteEditor) {
-                NoteEditorView(memoryService: memoryService, userId: userId) {
+                NoteEditorView(memoryService: memoryService, userId: userId, eventId: eventId) {
                     dismiss()
                 }
             }
             .sheet(isPresented: $showAudioRecorder) {
-                AudioRecorderView(memoryService: memoryService, userId: userId) {
+                AudioRecorderView(memoryService: memoryService, userId: userId, eventId: eventId) {
                     dismiss()
                 }
             }
@@ -164,6 +165,7 @@ struct MediaTypeButton: View {
 
     return MediaTypePickerView(
         memoryService: MemoryService(modelContext: modelContext),
-        userId: UUID()
+        userId: UUID(),
+        eventId: nil
     )
 }

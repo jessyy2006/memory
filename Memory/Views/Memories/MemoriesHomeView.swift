@@ -16,6 +16,12 @@ struct MemoriesHomeView: View {
     @State private var showMediaTypePicker = false
     @State private var navigateToPlayback = false
 
+    // Event management
+    private let eventService = EventService()
+    @State private var activeEvent: EventRecord?
+    @State private var upcomingEvents: [EventRecord] = []
+    @State private var showEventCreation = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -31,6 +37,33 @@ struct MemoriesHomeView: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 40) {
+                    // Active Event Badge
+                    if let active = activeEvent {
+                        VStack(spacing: 12) {
+                            HStack {
+                                Image(systemName: "calendar.badge.checkmark")
+                                    .foregroundColor(.green)
+                                Text(active.name)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Button("Stop Event") {
+                                    Task {
+                                        await stopActiveEvent()
+                                    }
+                                }
+                                .font(.caption)
+                                .buttonStyle(.bordered)
+                                .tint(.red)
+                            }
+                            .padding()
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 32)
+                        .padding(.top, 16)
+                    }
+
                     Spacer()
 
                     // Title
@@ -114,6 +147,23 @@ struct MemoriesHomeView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showEventCreation = true
+                    } label: {
+                        Image(systemName: "calendar.badge.plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showEventCreation) {
+                EventManagementView(
+                    activeEvent: activeEvent,
+                    upcomingEvents: upcomingEvents,
+                    onCreateEvent: createEvent,
+                    onStartEvent: startEvent
+                )
+            }
             .navigationDestination(isPresented: $navigateToPlayback) {
                 Group {
                     if let service = memoryService,
@@ -144,7 +194,8 @@ struct MemoriesHomeView: View {
                    let userId = authService.currentUserId {
                     MediaTypePickerView(
                         memoryService: service,
-                        userId: userId
+                        userId: userId,
+                        eventId: activeEvent?.id
                     )
                 }
             }
@@ -176,9 +227,59 @@ struct MemoriesHomeView: View {
 
                 // Sync with remote in background
                 await memoryService?.syncMemories(userId: realUserId)
+
+                // Load events
+                await loadEvents()
             } catch {
                 print("❌ Failed to get Supabase user: \(error)")
             }
+        }
+    }
+
+    // MARK: - Event Management
+
+    private func loadEvents() async {
+        do {
+            activeEvent = try await eventService.getActiveEvent()
+            upcomingEvents = try await eventService.getUpcomingEvents()
+        } catch {
+            print("❌ Failed to load events: \(error)")
+        }
+    }
+
+    private func createEvent(name: String, eventDate: Date, startTime: Date?, endTime: Date?) async {
+        do {
+            let userId = try await SupabaseManager.shared.getCurrentUserId()
+            let event = Event(
+                userId: userId,
+                name: name,
+                eventDate: eventDate,
+                startTime: startTime,
+                endTime: endTime
+            )
+            _ = try await eventService.createEvent(event)
+            await loadEvents()
+        } catch {
+            print("❌ Failed to create event: \(error)")
+        }
+    }
+
+    private func startEvent(_ event: EventRecord) async {
+        do {
+            _ = try await eventService.startEvent(eventId: event.id)
+            await loadEvents()
+        } catch {
+            print("❌ Failed to start event: \(error)")
+        }
+    }
+
+    private func stopActiveEvent() async {
+        guard let active = activeEvent else { return }
+        do {
+            _ = try await eventService.stopEvent(eventId: active.id)
+            await loadEvents()
+        } catch {
+            print("❌ Failed to stop event: \(error)")
         }
     }
 }
@@ -189,6 +290,131 @@ struct ScaleButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Event Management View
+struct EventManagementView: View {
+    @Environment(\.dismiss) private var dismiss
+    let activeEvent: EventRecord?
+    let upcomingEvents: [EventRecord]
+    let onCreateEvent: (String, Date, Date?, Date?) async -> Void
+    let onStartEvent: (EventRecord) async -> Void
+
+    @State private var showCreateForm = false
+    @State private var eventName = ""
+    @State private var eventDate = Date()
+    @State private var hasTimeRange = false
+    @State private var startTime = Date()
+    @State private var endTime = Date()
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let active = activeEvent {
+                    Section("Active Event") {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(active.name)
+                                    .font(.headline)
+                                Text(active.eventDate, style: .date)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+
+                if !upcomingEvents.isEmpty {
+                    Section("Upcoming Events") {
+                        ForEach(upcomingEvents, id: \.id) { event in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(event.name)
+                                        .font(.headline)
+                                    Text(event.eventDate, style: .date)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if activeEvent == nil {
+                                    Button("Start") {
+                                        Task {
+                                            await onStartEvent(event)
+                                            dismiss()
+                                        }
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    if showCreateForm {
+                        VStack(alignment: .leading, spacing: 12) {
+                            TextField("Event Name", text: $eventName)
+                                .textFieldStyle(.roundedBorder)
+
+                            DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+
+                            Toggle("Set Time Range", isOn: $hasTimeRange)
+
+                            if hasTimeRange {
+                                DatePicker("Start Time", selection: $startTime, displayedComponents: .hourAndMinute)
+                                DatePicker("End Time", selection: $endTime, displayedComponents: .hourAndMinute)
+                            }
+
+                            HStack {
+                                Button("Cancel") {
+                                    showCreateForm = false
+                                    eventName = ""
+                                }
+                                .buttonStyle(.bordered)
+
+                                Spacer()
+
+                                Button("Create") {
+                                    Task {
+                                        await onCreateEvent(
+                                            eventName,
+                                            eventDate,
+                                            hasTimeRange ? startTime : nil,
+                                            hasTimeRange ? endTime : nil
+                                        )
+                                        showCreateForm = false
+                                        eventName = ""
+                                        dismiss()
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(eventName.isEmpty)
+                            }
+                        }
+                    } else {
+                        Button {
+                            showCreateForm = true
+                        } label: {
+                            Label("Create New Event", systemImage: "plus.circle.fill")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Manage Events")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -11,6 +11,7 @@ struct NoteEditorView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID?
     let onComplete: () -> Void
 
     @State private var noteText = ""
@@ -108,7 +109,7 @@ struct NoteEditorView: View {
         isProcessing = true
         Task {
             do {
-                try await memoryService.createNoteMemory(userId: userId, noteText: noteText)
+                try await memoryService.createNoteMemory(userId: userId, noteText: noteText, eventId: eventId)
                 await MainActor.run {
                     isProcessing = false
                     onComplete()

@@ -13,6 +13,7 @@ struct VideoPickerView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID?
     let onComplete: () -> Void
 
     @State private var selectedItem: PhotosPickerItem?
@@ -132,7 +133,7 @@ struct VideoPickerView: View {
         isProcessing = true
         Task {
             do {
-                try await memoryService.createVideoMemory(userId: userId, videoURL: url)
+                try await memoryService.createVideoMemory(userId: userId, videoURL: url, eventId: eventId)
                 await MainActor.run {
                     isProcessing = false
                     onComplete()

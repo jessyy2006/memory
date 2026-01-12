@@ -64,6 +64,7 @@ class MemoryService {
                 let memory = Memory(
                     id: remoteMemory.id,
                     userId: remoteMemory.userId,
+                    eventId: remoteMemory.eventId,
                     type: MemoryType(rawValue: remoteMemory.type) ?? .note,
                     content: remoteMemory.content,
                     thumbnailURL: remoteMemory.thumbnailUrl,
@@ -87,7 +88,7 @@ class MemoryService {
     // MARK: - Create Memories
 
     /// Create a photo memory
-    func createPhotoMemory(userId: UUID, imageData: Data) async throws {
+    func createPhotoMemory(userId: UUID, imageData: Data, eventId: UUID? = nil) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -113,6 +114,7 @@ class MemoryService {
         // Create memory record
         let memory = Memory(
             userId: userId,
+            eventId: eventId,
             type: .photo,
             content: imageURL
         )
@@ -129,7 +131,7 @@ class MemoryService {
     }
 
     /// Create a video memory
-    func createVideoMemory(userId: UUID, videoURL: URL) async throws {
+    func createVideoMemory(userId: UUID, videoURL: URL, eventId: UUID? = nil) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -173,6 +175,7 @@ class MemoryService {
         // Create memory record
         let memory = Memory(
             userId: userId,
+            eventId: eventId,
             type: .video,
             content: videoURLString,
             thumbnailURL: thumbnailURLString,
@@ -191,7 +194,7 @@ class MemoryService {
     }
 
     /// Create a note memory
-    func createNoteMemory(userId: UUID, noteText: String) async throws {
+    func createNoteMemory(userId: UUID, noteText: String, eventId: UUID? = nil) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -209,6 +212,7 @@ class MemoryService {
         // Create memory record
         let memory = Memory(
             userId: userId,
+            eventId: eventId,
             type: .note,
             content: noteText
         )
@@ -225,7 +229,7 @@ class MemoryService {
     }
 
     /// Create an audio memory
-    func createAudioMemory(userId: UUID, audioURL: URL) async throws {
+    func createAudioMemory(userId: UUID, audioURL: URL, eventId: UUID? = nil) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -257,6 +261,7 @@ class MemoryService {
         // Create memory record
         let memory = Memory(
             userId: userId,
+            eventId: eventId,
             type: .audio,
             content: audioURLString,
             duration: duration

@@ -27,6 +27,7 @@ struct CreateAccountView: View {
 
     @State private var isCreatingAccount = false
     @State private var showVerificationView = false
+    @State private var showProfileCompletion = false
     @State private var createdUser: User?
 
     var body: some View {
@@ -180,7 +181,19 @@ struct CreateAccountView: View {
                         authService: bindableAuthService,
                         user: user,
                         contactMethod: contactMethod == .email ? user.email ?? "" : user.phoneNumber ?? "",
-                        isEmail: contactMethod == .email
+                        isEmail: contactMethod == .email,
+                        onVerificationSuccess: {
+                            showProfileCompletion = true
+                        }
+                    )
+                }
+            }
+            .navigationDestination(isPresented: $showProfileCompletion) {
+                if let user = createdUser {
+                    @Bindable var bindableAuthService = authService
+                    ProfileCompletionView(
+                        authService: bindableAuthService,
+                        user: user
                     )
                 }
             }
@@ -198,7 +211,7 @@ struct CreateAccountView: View {
             return
         }
 
-        Task {
+        Task { @MainActor in
             isCreatingAccount = true
             defer { isCreatingAccount = false }
 
@@ -224,7 +237,7 @@ struct CreateAccountView: View {
     }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
-        Task {
+        Task { @MainActor in
             isCreatingAccount = true
             defer { isCreatingAccount = false }
 

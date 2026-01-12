@@ -17,6 +17,7 @@ struct MemoryApp: App {
             Item.self,
             User.self,
             Memory.self,
+            Event.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

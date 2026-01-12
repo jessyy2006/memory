@@ -18,9 +18,14 @@ struct MemoriesHomeView: View {
 
     // Event management
     private let eventService = EventService()
+    let selectedEvent: EventRecord? // Event passed from EventsHomeView
     @State private var activeEvent: EventRecord?
     @State private var upcomingEvents: [EventRecord] = []
     @State private var showEventCreation = false
+
+    init(selectedEvent: EventRecord? = nil) {
+        self.selectedEvent = selectedEvent
+    }
 
     var body: some View {
         NavigationStack {
@@ -195,7 +200,8 @@ struct MemoriesHomeView: View {
                     MediaTypePickerView(
                         memoryService: service,
                         userId: userId,
-                        eventId: activeEvent?.id
+                        eventId: activeEvent?.id,
+                        eventName: activeEvent?.name
                     )
                 }
             }
@@ -230,6 +236,13 @@ struct MemoriesHomeView: View {
 
                 // Load events
                 await loadEvents()
+
+                // If selectedEvent was provided, use it as activeEvent
+                if let selected = selectedEvent {
+                    await MainActor.run {
+                        activeEvent = selected
+                    }
+                }
             } catch {
                 print("❌ Failed to get Supabase user: \(error)")
             }

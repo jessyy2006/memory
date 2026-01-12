@@ -50,6 +50,55 @@ class AuthenticationService {
         currentUser?.id
     }
 
+    init() {
+        // Check for existing session on init
+        Task {
+            await restoreSession()
+        }
+    }
+
+    // MARK: - Session Management
+
+    @MainActor
+    private func restoreSession() async {
+        do {
+            print("🔄 Checking for existing session...")
+
+            if let session = try await supabase.getCurrentSession() {
+                print("✅ Found existing session for user: \(session.user.id)")
+
+                // Check if session is expired
+                if Date().timeIntervalSince1970 > session.expiresAt {
+                    print("⚠️ Session is expired")
+                    isAuthenticated = false
+                    currentUser = nil
+                    return
+                }
+
+                // Session is valid - restore authentication state
+                print("✅ Session is valid, restoring authentication...")
+
+                let user = User(
+                    id: session.user.id,
+                    email: session.user.email,
+                    isEmailVerified: true,
+                    authProvider: .emailPassword
+                )
+
+                currentUser = user
+                isAuthenticated = true
+                print("✅ Authentication restored successfully")
+            } else {
+                print("ℹ️ No existing session found")
+                isAuthenticated = false
+            }
+        } catch {
+            print("❌ Error restoring session: \(error.localizedDescription)")
+            isAuthenticated = false
+            currentUser = nil
+        }
+    }
+
     // MARK: - Email/Phone Validation
 
     func validateEmail(_ email: String) -> Bool {

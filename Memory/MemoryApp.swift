@@ -31,13 +31,22 @@ struct MemoryApp: App {
     var body: some Scene {
         WindowGroup {
             if authService.isAuthenticated {
-                MemoriesHomeView()
+                EventsHomeView()
                     .environment(authService)
+                    .onAppear {
+                        print("🏠 [MemoryApp] EventsHomeView appeared - user is authenticated")
+                    }
             } else {
                 CreateAccountView()
                     .environment(authService)
+                    .onAppear {
+                        print("📝 [MemoryApp] CreateAccountView appeared - user not authenticated")
+                    }
             }
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: authService.isAuthenticated) { oldValue, newValue in
+            print("🔐 [MemoryApp] Authentication changed: \(oldValue) → \(newValue)")
+        }
     }
 }

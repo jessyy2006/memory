@@ -13,6 +13,7 @@ struct MediaTypePickerView: View {
     let memoryService: MemoryService
     let userId: UUID
     let eventId: UUID?
+    let eventName: String?
 
     @State private var showImagePicker = false
     @State private var showVideoPicker = false
@@ -22,10 +23,36 @@ struct MediaTypePickerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
+                // Event Name Display
+                if let eventName = eventName {
+                    VStack(spacing: 8) {
+                        Text("Adding to Event")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .foregroundColor(.green)
+                            Text(eventName)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.green.opacity(0.1))
+                        )
+                    }
+                    .padding(.top, 20)
+                }
+
                 Text("Choose Memory Type")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .padding(.top, 32)
+                    .padding(.top, eventName != nil ? 16 : 32)
 
                 VStack(spacing: 16) {
                     // Photo Option
@@ -166,6 +193,7 @@ struct MediaTypeButton: View {
     return MediaTypePickerView(
         memoryService: MemoryService(modelContext: modelContext),
         userId: UUID(),
-        eventId: nil
+        eventId: nil,
+        eventName: nil
     )
 }

@@ -41,7 +41,12 @@ final class EventService {
     /// - Parameter event: The event to create
     /// - Returns: The created event record
     func createEvent(_ event: Event) async throws -> EventRecord {
+        print("📝 [EventService] Creating event: \(event.name)")
+        print("📝 [EventService] Event date: \(event.eventDate)")
+        print("📝 [EventService] User ID: \(event.userId)")
+
         let insert = EventInsert(event: event)
+        print("📝 [EventService] EventInsert: \(insert)")
 
         let response: EventRecord = try await supabase
             .from(SupabaseConfig.Tables.events)
@@ -51,21 +56,63 @@ final class EventService {
             .execute()
             .value
 
+        print("✅ [EventService] Event created in Supabase: ID=\(response.id), Name=\(response.name)")
         return response
     }
 
-    /// Fetches all events for the current user, sorted by event_date
-    /// - Returns: Array of event records sorted by date
+    /// Fetches all events for the current user, sorted chronologically
+    /// - Returns: Array of event records sorted with upcoming events first (soonest first), then past events
     func fetchEvents() async throws -> [EventRecord] {
         let userId = try await SupabaseManager.shared.getCurrentUserId()
+        print("🔍 [EventService] Fetching events for user: \(userId)")
 
-        // Use the stored procedure for sorted events
-        let response: [EventRecord] = try await supabase
-            .rpc(SupabaseConfig.Functions.getEventsSorted, params: GetEventsSortedParams(p_user_id: userId.uuidString))
-            .execute()
-            .value
+        var events: [EventRecord]
 
-        return response
+        do {
+            // Try using the stored procedure first
+            print("🔍 [EventService] Calling RPC: \(SupabaseConfig.Functions.getEventsSorted)")
+            events = try await supabase
+                .rpc(SupabaseConfig.Functions.getEventsSorted, params: GetEventsSortedParams(p_user_id: userId.uuidString))
+                .execute()
+                .value
+
+            print("✅ [EventService] RPC returned \(events.count) events")
+        } catch {
+            print("⚠️ [EventService] RPC failed: \(error.localizedDescription)")
+            print("⚠️ [EventService] Falling back to direct query...")
+
+            // Fallback: Direct SELECT query
+            events = try await supabase
+                .from(SupabaseConfig.Tables.events)
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .order("event_date", ascending: true)
+                .execute()
+                .value
+
+            print("✅ [EventService] Direct query returned \(events.count) events")
+        }
+
+        // Sort events: upcoming first (soonest first), then past events (most recent first)
+        let today = Calendar.current.startOfDay(for: Date())
+        let sortedEvents = events.sorted { event1, event2 in
+            let date1 = Calendar.current.startOfDay(for: event1.eventDate)
+            let date2 = Calendar.current.startOfDay(for: event2.eventDate)
+
+            let isEvent1Upcoming = date1 >= today
+            let isEvent2Upcoming = date2 >= today
+
+            // Both upcoming or both past - sort by date
+            if isEvent1Upcoming == isEvent2Upcoming {
+                return isEvent1Upcoming ? date1 < date2 : date1 > date2
+            }
+
+            // One upcoming, one past - upcoming comes first
+            return isEvent1Upcoming
+        }
+
+        print("📅 [EventService] Events sorted: upcoming first (soonest → latest), then past")
+        return sortedEvents
     }
 
     /// Fetches a single event by ID
@@ -133,18 +180,35 @@ final class EventService {
     func startEvent(eventId: UUID) async throws -> EventActionResponse {
         let userId = try await SupabaseManager.shared.getCurrentUserId()
 
+        print("🎬 [EventService] startEvent() called")
+        print("   - Event ID: \(eventId)")
+        print("   - User ID: \(userId)")
+        print("📞 [EventService] Calling RPC: start_event")
+
         let response: EventActionResponse = try await supabase
             .rpc(SupabaseConfig.Functions.startEvent, params: StartEventParams(p_event_id: eventId.uuidString, p_user_id: userId.uuidString))
             .execute()
             .value
 
+        print("📬 [EventService] RPC Response received:")
+        print("   - success: \(response.success)")
+        print("   - error: \(response.error ?? "none")")
+        print("   - event_id: \(response.eventId?.uuidString ?? "nil")")
+        print("   - most_upcoming_event_id: \(response.mostUpcomingEventId?.uuidString ?? "nil")")
+
         if !response.success {
+            print("❌ [EventService] Event start FAILED!")
+            print("   - Reason: \(response.error ?? "Unknown")")
+            if let mostUpcomingId = response.mostUpcomingEventId {
+                print("   - Most upcoming event ID: \(mostUpcomingId)")
+            }
             throw EventServiceError.cannotStartEvent(
                 reason: response.error ?? "Unknown error",
                 mostUpcomingEventId: response.mostUpcomingEventId
             )
         }
 
+        print("✅ [EventService] Event started successfully!")
         return response
     }
 
@@ -235,18 +299,60 @@ final class EventService {
         return mostUpcoming.id == eventId
     }
 
-    /// Gets upcoming events (event_date >= current date)
+    /// Gets upcoming events (events that haven't ended yet)
     /// - Returns: Array of upcoming events
     func getUpcomingEvents() async throws -> [EventRecord] {
         let allEvents = try await fetchEvents()
-        return allEvents.filter { $0.isUpcoming == true }
+        let now = Date()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+
+        return allEvents.filter { event in
+            // Check if event has ended
+            if let endTime = event.endTime {
+                // Combine event date + end time
+                let eventDay = calendar.startOfDay(for: event.eventDate)
+                let endHour = calendar.component(.hour, from: endTime)
+                let endMinute = calendar.component(.minute, from: endTime)
+
+                guard let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) else {
+                    return calendar.startOfDay(for: event.eventDate) >= today
+                }
+
+                return eventEndDateTime >= now
+            } else {
+                // No end time - use date-only comparison
+                return calendar.startOfDay(for: event.eventDate) >= today
+            }
+        }
     }
 
-    /// Gets past events (event_date < current date)
+    /// Gets past events (events that have already ended)
     /// - Returns: Array of past events
     func getPastEvents() async throws -> [EventRecord] {
         let allEvents = try await fetchEvents()
-        return allEvents.filter { $0.isUpcoming == false }
+        let now = Date()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+
+        return allEvents.filter { event in
+            // Check if event has ended
+            if let endTime = event.endTime {
+                // Combine event date + end time
+                let eventDay = calendar.startOfDay(for: event.eventDate)
+                let endHour = calendar.component(.hour, from: endTime)
+                let endMinute = calendar.component(.minute, from: endTime)
+
+                guard let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) else {
+                    return calendar.startOfDay(for: event.eventDate) < today
+                }
+
+                return eventEndDateTime < now
+            } else {
+                // No end time - use date-only comparison
+                return calendar.startOfDay(for: event.eventDate) < today
+            }
+        }
     }
 }
 

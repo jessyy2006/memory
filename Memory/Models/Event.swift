@@ -195,6 +195,28 @@ struct EventRecord: Codable, Hashable {
         updatedAt = updated
     }
 
+    /// Returns true if the event has ended (based on end_time or event_date)
+    var isEnded: Bool {
+        let now = Date()
+        let calendar = Calendar.current
+
+        if let endTime = endTime {
+            // Combine event date + end time
+            let eventDay = calendar.startOfDay(for: eventDate)
+            let endHour = calendar.component(.hour, from: endTime)
+            let endMinute = calendar.component(.minute, from: endTime)
+
+            guard let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) else {
+                return calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now)
+            }
+
+            return eventEndDateTime < now
+        } else {
+            // No end time - use date-only comparison
+            return calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now)
+        }
+    }
+
     /// Convert to SwiftData model
     func toEvent() -> Event {
         Event(

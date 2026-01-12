@@ -27,6 +27,16 @@ struct EventsHomeView: View {
 
     // Navigation
     @State private var navigateToMemories: EventRecord?
+    @State private var navigateToPastEvents = false
+
+    // Filtered events for display
+    private var activeEvents: [EventRecord] {
+        allEvents.filter { !$0.isEnded }
+    }
+
+    private var pastEvents: [EventRecord] {
+        allEvents.filter { $0.isEnded }
+    }
 
     var body: some View {
         NavigationStack {
@@ -47,7 +57,7 @@ struct EventsHomeView: View {
                         Spacer()
                         ProgressView("Loading events...")
                         Spacer()
-                    } else if allEvents.isEmpty {
+                    } else if activeEvents.isEmpty && pastEvents.isEmpty {
                         // Empty State
                         VStack(spacing: 24) {
                             Spacer()
@@ -97,7 +107,7 @@ struct EventsHomeView: View {
                                         Text("My Events")
                                             .font(.largeTitle)
                                             .fontWeight(.bold)
-                                        Text("\(allEvents.count) event\(allEvents.count == 1 ? "" : "s")")
+                                        Text("\(activeEvents.count) event\(activeEvents.count == 1 ? "" : "s")")
                                             .font(.subheadline)
                                             .foregroundColor(.secondary)
                                     }
@@ -106,8 +116,8 @@ struct EventsHomeView: View {
                                 .padding(.horizontal, 20)
                                 .padding(.top, 20)
 
-                                // Events Cards
-                                ForEach(allEvents, id: \.id) { event in
+                                // Events Cards (only non-ended events)
+                                ForEach(activeEvents, id: \.id) { event in
                                     EventCard(
                                         event: event,
                                         isActive: event.id == activeEvent?.id,
@@ -116,6 +126,32 @@ struct EventsHomeView: View {
                                         }
                                     )
                                     .padding(.horizontal, 20)
+                                }
+
+                                // Past Events Button
+                                if !pastEvents.isEmpty {
+                                    Button {
+                                        navigateToPastEvents = true
+                                    } label: {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text("Past Events")
+                                                    .font(.headline)
+                                                    .foregroundColor(.primary)
+                                                Text("\(pastEvents.count) ended event\(pastEvents.count == 1 ? "" : "s")")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding()
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(12)
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 8)
                                 }
 
                                 // Add some bottom padding
@@ -156,6 +192,9 @@ struct EventsHomeView: View {
             }
             .navigationDestination(item: $navigateToMemories) { event in
                 MemoriesHomeView(selectedEvent: event)
+            }
+            .navigationDestination(isPresented: $navigateToPastEvents) {
+                PastEventsView()
             }
             .alert("Start Event", isPresented: $showStartConfirmation) {
                 Button("Cancel", role: .cancel) {
@@ -431,7 +470,7 @@ struct EventCard: View {
                             Image(systemName: "checkmark.circle")
                                 .font(.title2)
                                 .foregroundColor(.gray)
-                            Text("Past")
+                            Text("Ended")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.gray)

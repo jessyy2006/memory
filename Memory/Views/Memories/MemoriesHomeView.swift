@@ -73,7 +73,7 @@ struct MemoriesHomeView: View {
 
                     // Title
                     VStack(spacing: 8) {
-                        Text("Your Memories")
+                        Text(activeEvent?.name ?? "Your Memories")
                             .font(.largeTitle)
                             .fontWeight(.bold)
 
@@ -154,10 +154,24 @@ struct MemoriesHomeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showEventCreation = true
-                    } label: {
-                        Image(systemName: "calendar.badge.plus")
+                    if activeEvent != nil {
+                        // Show "End Event" button when event is active
+                        Button {
+                            Task {
+                                await endEventAndNavigateToPlayback()
+                            }
+                        } label: {
+                            Text("End Event")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                    } else {
+                        // Show schedule icon when no event is active
+                        Button {
+                            showEventCreation = true
+                        } label: {
+                            Image(systemName: "calendar.badge.plus")
+                        }
                     }
                 }
             }
@@ -293,6 +307,29 @@ struct MemoriesHomeView: View {
             await loadEvents()
         } catch {
             print("❌ Failed to stop event: \(error)")
+        }
+    }
+
+    private func endEventAndNavigateToPlayback() async {
+        guard let active = activeEvent else { return }
+
+        print("🛑 [MemoriesHomeView] Ending event: \(active.name)")
+
+        do {
+            // Stop the event
+            _ = try await eventService.stopEvent(eventId: active.id)
+            print("✅ [MemoriesHomeView] Event stopped successfully")
+
+            // Reload events to update state
+            await loadEvents()
+
+            // Navigate to playback
+            await MainActor.run {
+                print("🎬 [MemoriesHomeView] Navigating to playback screen...")
+                navigateToPlayback = true
+            }
+        } catch {
+            print("❌ [MemoriesHomeView] Failed to stop event: \(error)")
         }
     }
 }

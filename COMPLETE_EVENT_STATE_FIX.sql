@@ -277,6 +277,9 @@ $$;
 -- STEP 5: Update get_events_sorted to return is_ended column
 -- ============================================================================
 
+-- Drop existing function first (required when changing return type)
+DROP FUNCTION IF EXISTS get_events_sorted(uuid);
+
 CREATE OR REPLACE FUNCTION get_events_sorted(p_user_id UUID)
 RETURNS TABLE (
   id UUID,

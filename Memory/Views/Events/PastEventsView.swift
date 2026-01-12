@@ -148,12 +148,21 @@ struct PastEventsView: View {
         do {
             print("🔄 [PastEventsView] Loading past events...")
 
-            // Fetch past events using EventService
-            let events = try await eventService.getPastEvents()
-            print("📥 [PastEventsView] Received \(events.count) past events")
+            // Fetch ALL events and filter client-side using isEnded
+            let allEvents = try await eventService.fetchEvents()
+            print("📥 [PastEventsView] Received \(allEvents.count) total events")
+
+            // Filter to only ended events using the isEnded computed property
+            let endedEvents = allEvents.filter { $0.isEnded }
+            print("🔍 [PastEventsView] Filtered to \(endedEvents.count) past events")
+
+            // Debug: Print each event's status
+            for event in allEvents {
+                print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isEnded=\(event.isEnded)")
+            }
 
             // Sort by date descending (most recent first)
-            let sortedEvents = events.sorted { $0.eventDate > $1.eventDate }
+            let sortedEvents = endedEvents.sorted { $0.eventDate > $1.eventDate }
 
             await MainActor.run {
                 pastEvents = sortedEvents

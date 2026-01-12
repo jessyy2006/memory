@@ -198,32 +198,41 @@ struct EventRecord: Codable, Hashable {
     /// Returns true if the event has ended
     /// An event is considered "ended" if:
     /// 1. Its date/time has passed, OR
-    /// 2. It was manually stopped (not active AND not the upcoming event)
+    /// 2. It was manually stopped (not active)
     var isEnded: Bool {
-        // An event is ended if it's not active and not upcoming
-        // When you "End Event", the database sets is_active=false and updates is_upcoming
-        // So any event where both are false/nil is considered ended
-        if !isActive && (isUpcoming == nil || isUpcoming == false) {
-            return true
-        }
-
-        // Also check if event's date/time has passed
         let now = Date()
         let calendar = Calendar.current
 
+        // First check if event's date/time has passed
         if let endTime = endTime {
             let eventDay = calendar.startOfDay(for: eventDate)
             let endHour = calendar.component(.hour, from: endTime)
             let endMinute = calendar.component(.minute, from: endTime)
 
-            guard let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) else {
-                return calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now)
+            if let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) {
+                if eventEndDateTime < now {
+                    return true
+                }
+            } else if calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now) {
+                return true
             }
-
-            return eventEndDateTime < now
-        } else {
-            return calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now)
+        } else if calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now) {
+            return true
         }
+
+        // WORKAROUND: If event is not active and date is today or in past, consider it ended
+        // This handles the case where database doesn't update is_upcoming on stop
+        if !isActive {
+            let eventDay = calendar.startOfDay(for: eventDate)
+            let today = calendar.startOfDay(for: now)
+
+            // If event was on or before today and is not active, it's ended
+            if eventDay <= today {
+                return true
+            }
+        }
+
+        return false
     }
 
     /// Convert to SwiftData model

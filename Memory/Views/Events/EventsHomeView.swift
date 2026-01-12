@@ -31,11 +31,19 @@ struct EventsHomeView: View {
 
     // Filtered events for display
     private var activeEvents: [EventRecord] {
-        allEvents.filter { !$0.isEnded }
+        let filtered = allEvents.filter { !$0.isEnded }
+        print("🔍 [EventsHomeView] activeEvents filter:")
+        for event in allEvents {
+            print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isEnded=\(event.isEnded)")
+        }
+        print("   → \(filtered.count) active events")
+        return filtered
     }
 
     private var pastEvents: [EventRecord] {
-        allEvents.filter { $0.isEnded }
+        let filtered = allEvents.filter { $0.isEnded }
+        print("🔍 [EventsHomeView] pastEvents filter: \(filtered.count) past events")
+        return filtered
     }
 
     var body: some View {

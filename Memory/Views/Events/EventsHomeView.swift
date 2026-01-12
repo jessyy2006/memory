@@ -258,6 +258,10 @@ struct EventsHomeView: View {
     // MARK: - Event Handling
 
     private func handleEventTap(_ event: EventRecord) {
+        // Navigation Guard: Ended events go straight to playback
+        // This is handled by PastEventsView - events here are filtered to NOT be ended
+        // So this function only handles active or upcoming events
+
         if event.id == activeEvent?.id {
             // Already active - navigate to memories
             navigateToMemories = event

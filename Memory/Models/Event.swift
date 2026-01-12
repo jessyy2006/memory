@@ -119,6 +119,7 @@ struct EventRecord: Codable, Hashable {
     let endTime: Date?
     let isActive: Bool
     let isUpcoming: Bool?
+    let isEnded: Bool
     let createdAt: Date
     let updatedAt: Date
 
@@ -131,6 +132,7 @@ struct EventRecord: Codable, Hashable {
         case endTime = "end_time"
         case isActive = "is_active"
         case isUpcoming = "is_upcoming"
+        case isEnded = "is_ended"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -144,6 +146,7 @@ struct EventRecord: Codable, Hashable {
         name = try container.decode(String.self, forKey: .name)
         isActive = try container.decode(Bool.self, forKey: .isActive)
         isUpcoming = try container.decodeIfPresent(Bool.self, forKey: .isUpcoming)
+        isEnded = try container.decode(Bool.self, forKey: .isEnded)
 
         // Decode eventDate (DATE format: "2026-01-12")
         // Use user's local timezone so "2026-01-12" displays as "2026-01-12" in their region
@@ -195,45 +198,6 @@ struct EventRecord: Codable, Hashable {
         updatedAt = updated
     }
 
-    /// Returns true if the event has ended
-    /// An event is considered "ended" if:
-    /// 1. Its date/time has passed, OR
-    /// 2. It was manually stopped (not active)
-    var isEnded: Bool {
-        let now = Date()
-        let calendar = Calendar.current
-
-        // First check if event's date/time has passed
-        if let endTime = endTime {
-            let eventDay = calendar.startOfDay(for: eventDate)
-            let endHour = calendar.component(.hour, from: endTime)
-            let endMinute = calendar.component(.minute, from: endTime)
-
-            if let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) {
-                if eventEndDateTime < now {
-                    return true
-                }
-            } else if calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now) {
-                return true
-            }
-        } else if calendar.startOfDay(for: eventDate) < calendar.startOfDay(for: now) {
-            return true
-        }
-
-        // WORKAROUND: If event is not active and date is today or in past, consider it ended
-        // This handles the case where database doesn't update is_upcoming on stop
-        if !isActive {
-            let eventDay = calendar.startOfDay(for: eventDate)
-            let today = calendar.startOfDay(for: now)
-
-            // If event was on or before today and is not active, it's ended
-            if eventDay <= today {
-                return true
-            }
-        }
-
-        return false
-    }
 
     /// Convert to SwiftData model
     func toEvent() -> Event {
@@ -260,6 +224,7 @@ struct EventInsert: Encodable {
     let startTime: String?
     let endTime: String?
     let isActive: Bool
+    let isEnded: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -269,6 +234,7 @@ struct EventInsert: Encodable {
         case startTime = "start_time"
         case endTime = "end_time"
         case isActive = "is_active"
+        case isEnded = "is_ended"
     }
 
     init(event: Event) {
@@ -285,6 +251,7 @@ struct EventInsert: Encodable {
         self.startTime = event.startTime.map { timeFormatter.string(from: $0) }
         self.endTime = event.endTime.map { timeFormatter.string(from: $0) }
         self.isActive = event.isActive
+        self.isEnded = false  // New events are not ended
     }
 }
 

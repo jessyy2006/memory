@@ -148,13 +148,13 @@ struct PastEventsView: View {
         do {
             print("🔄 [PastEventsView] Loading past events...")
 
-            // Fetch ALL events and filter client-side using isEnded
+            // Fetch ALL events from database
             let allEvents = try await eventService.fetchEvents()
             print("📥 [PastEventsView] Received \(allEvents.count) total events")
 
-            // Filter to only ended events using the isEnded computed property
+            // Filter to only ended events using the database is_ended field
             let endedEvents = allEvents.filter { $0.isEnded }
-            print("🔍 [PastEventsView] Filtered to \(endedEvents.count) past events")
+            print("🔍 [PastEventsView] Filtered to \(endedEvents.count) past events (is_ended = true)")
 
             // Debug: Print each event's status
             for event in allEvents {

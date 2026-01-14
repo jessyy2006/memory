@@ -119,6 +119,7 @@ struct EventRecord: Codable, Hashable {
     let endTime: Date?
     let isActive: Bool
     let isUpcoming: Bool?
+    let isFuture: Bool?
     let isEnded: Bool
     let createdAt: Date
     let updatedAt: Date
@@ -132,6 +133,7 @@ struct EventRecord: Codable, Hashable {
         case endTime = "end_time"
         case isActive = "is_active"
         case isUpcoming = "is_upcoming"
+        case isFuture = "is_future"
         case isEnded = "is_ended"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -146,6 +148,7 @@ struct EventRecord: Codable, Hashable {
         name = try container.decode(String.self, forKey: .name)
         isActive = try container.decode(Bool.self, forKey: .isActive)
         isUpcoming = try container.decodeIfPresent(Bool.self, forKey: .isUpcoming)
+        isFuture = try container.decodeIfPresent(Bool.self, forKey: .isFuture)
         isEnded = try container.decode(Bool.self, forKey: .isEnded)
 
         // Decode eventDate (DATE format: "2026-01-12")

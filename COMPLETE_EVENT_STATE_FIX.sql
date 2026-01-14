@@ -44,9 +44,9 @@ BEGIN
     WHERE user_id = v_user_id
       AND is_active = false
       AND (
-        -- Event date has passed
+        -- Event date has passed (use <= so events at exact current time are considered ended)
         (end_time IS NOT NULL AND
-         (event_date || ' ' || end_time::TEXT)::TIMESTAMP < NOW()) OR
+         (event_date || ' ' || end_time::TEXT)::TIMESTAMP <= NOW()) OR
         (end_time IS NULL AND event_date < CURRENT_DATE)
       );
 
@@ -63,9 +63,9 @@ BEGIN
       AND is_ended = false
       AND is_active = false
       AND (
-        -- If event has end_time, check if it hasn't passed
+        -- If event has end_time, check if it hasn't passed (use > not >=)
         (end_time IS NOT NULL AND
-         (event_date || ' ' || end_time::TEXT)::TIMESTAMP >= NOW()) OR
+         (event_date || ' ' || end_time::TEXT)::TIMESTAMP > NOW()) OR
         -- If no end_time, check if date is today or future
         (end_time IS NULL AND event_date >= CURRENT_DATE)
       )
@@ -238,9 +238,9 @@ BEGIN
       AND is_ended = false
       AND is_active = false
       AND (
-        -- If event has end_time, check if it hasn't passed
+        -- If event has end_time, check if it hasn't passed (use > not >=)
         (end_time IS NOT NULL AND
-         (event_date || ' ' || end_time::TEXT)::TIMESTAMP >= NOW()) OR
+         (event_date || ' ' || end_time::TEXT)::TIMESTAMP > NOW()) OR
         -- If no end_time, check if date is today or future
         (end_time IS NULL AND event_date >= CURRENT_DATE)
       )

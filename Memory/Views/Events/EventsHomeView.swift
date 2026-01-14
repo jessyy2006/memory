@@ -435,9 +435,11 @@ struct EventCard: View {
     let onTap: () -> Void
 
     private var isUpcoming: Bool {
-        // Use the database's isUpcoming value which factors in end_time
-        // Fallback to date comparison if not available
-        event.isUpcoming ?? (event.eventDate >= Date())
+        // Show as upcoming if EITHER:
+        // 1. Database says this is the most upcoming event (isUpcoming = true), OR
+        // 2. Event is in the future (isFuture = true)
+        // This ensures ALL future events show the blue "Upcoming" badge
+        event.isUpcoming == true || event.isFuture == true
     }
 
     private var isPast: Bool {
@@ -537,6 +539,31 @@ struct CreateEventFormView: View {
     @State private var startTime = Date()
     @State private var endTime = Date()
     @State private var isCreating = false
+    @State private var showPastEventError = false
+
+    /// Check if the event's end time is in the past
+    private func isPastEvent() -> Bool {
+        if hasTimeRange {
+            // Combine event date + end time to create full datetime
+            let calendar = Calendar.current
+            let eventDay = calendar.startOfDay(for: eventDate)
+            let endHour = calendar.component(.hour, from: endTime)
+            let endMinute = calendar.component(.minute, from: endTime)
+
+            guard let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) else {
+                return false
+            }
+
+            // Event is in the past if end time has already passed
+            return eventEndDateTime <= Date()
+        } else {
+            // No time range - just check if date is in the past
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            let eventDay = calendar.startOfDay(for: eventDate)
+            return eventDay < today
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -572,15 +599,25 @@ struct CreateEventFormView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        Task {
-                            isCreating = true
-                            await onCreate(eventName, eventDate, hasTimeRange ? startTime : nil, hasTimeRange ? endTime : nil)
-                            isCreating = false
-                            dismiss()
+                        // Validate that event is not in the past
+                        if isPastEvent() {
+                            showPastEventError = true
+                        } else {
+                            Task {
+                                isCreating = true
+                                await onCreate(eventName, eventDate, hasTimeRange ? startTime : nil, hasTimeRange ? endTime : nil)
+                                isCreating = false
+                                dismiss()
+                            }
                         }
                     }
                     .disabled(eventName.isEmpty || isCreating)
                 }
+            }
+            .alert("Can't Create Past Event", isPresented: $showPastEventError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Sorry, you can't create a past event.")
             }
         }
     }

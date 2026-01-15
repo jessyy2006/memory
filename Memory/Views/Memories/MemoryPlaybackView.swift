@@ -12,6 +12,7 @@ struct MemoryPlaybackView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
+    let eventId: UUID // Required for syncing the correct event's memories
     let eventName: String? // Optional event name
 
     @State private var showDeleteConfirmation = false
@@ -82,7 +83,7 @@ struct MemoryPlaybackView: View {
             }
         }
         .refreshable {
-            await memoryService.syncMemories(userId: userId)
+            await memoryService.syncMemories(userId: userId, eventId: eventId)
         }
         .alert("Delete Memory", isPresented: $showDeleteConfirmation, presenting: memoryToDelete) { memory in
             Button("Cancel", role: .cancel) {}
@@ -107,6 +108,7 @@ struct MemoryPlaybackView: View {
         MemoryPlaybackView(
             memoryService: MemoryService(modelContext: modelContext),
             userId: UUID(),
+            eventId: UUID(),
             eventName: "Test Event"
         )
     }

@@ -13,7 +13,7 @@ struct AudioRecorderView: View {
     @Environment(\.dismiss) private var dismiss
     let memoryService: MemoryService
     let userId: UUID
-    let eventId: UUID?
+    let eventId: UUID  // REQUIRED: Every memory must belong to an event
     let onComplete: () -> Void
 
     @StateObject private var audioRecorder = AudioRecorder()

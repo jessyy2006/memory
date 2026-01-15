@@ -26,40 +26,50 @@ class MemoryService {
 
     // MARK: - Fetch Memories
 
-    /// Fetch all memories for the current user from local storage
-    func fetchLocalMemories(userId: UUID) {
+    /// Fetch memories for a specific event from local storage
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - eventId: The event ID to filter by (REQUIRED for data isolation)
+    func fetchLocalMemories(userId: UUID, eventId: UUID) {
         let descriptor = FetchDescriptor<Memory>(
-            predicate: #Predicate { $0.userId == userId },
+            predicate: #Predicate { memory in
+                memory.userId == userId && memory.eventId == eventId
+            },
             sortBy: [SortDescriptor(\.timestamp, order: .forward)]
         )
 
         do {
             memories = try modelContext.fetch(descriptor)
-            print("✅ Fetched \(memories.count) local memories for user \(userId)")
+            print("✅ Fetched \(memories.count) local memories for user \(userId) in event \(eventId)")
         } catch {
             self.error = error
             print("❌ Error fetching local memories: \(error)")
         }
     }
 
-    /// Sync memories from Supabase to local storage
-    func syncMemories(userId: UUID) async {
+    /// Sync memories for a specific event from Supabase to local storage
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - eventId: The event ID to sync (REQUIRED for data isolation)
+    func syncMemories(userId: UUID, eventId: UUID) async {
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let remoteMemories = try await supabaseManager.fetchMemories(userId: userId)
+            let remoteMemories = try await supabaseManager.fetchMemories(userId: userId, eventId: eventId)
 
-            // Clear local cache and insert fresh data
+            // Clear local cache for this specific event
             let descriptor = FetchDescriptor<Memory>(
-                predicate: #Predicate { $0.userId == userId }
+                predicate: #Predicate { memory in
+                    memory.userId == userId && memory.eventId == eventId
+                }
             )
             let localMemories = try modelContext.fetch(descriptor)
             for memory in localMemories {
                 modelContext.delete(memory)
             }
 
-            // Insert remote memories
+            // Insert remote memories for this event
             for remoteMemory in remoteMemories {
                 let memory = Memory(
                     id: remoteMemory.id,
@@ -77,7 +87,7 @@ class MemoryService {
             }
 
             try modelContext.save()
-            fetchLocalMemories(userId: userId)
+            fetchLocalMemories(userId: userId, eventId: eventId)
 
         } catch {
             self.error = error
@@ -85,10 +95,41 @@ class MemoryService {
         }
     }
 
+    // MARK: - Deduplication
+
+    /// Check if a memory with the same content already exists in the event
+    /// - Parameters:
+    ///   - eventId: The event ID
+    ///   - content: The memory content (file URL or note text)
+    /// - Returns: True if a duplicate exists, false otherwise
+    private func isDuplicate(eventId: UUID, content: String) -> Bool {
+        let descriptor = FetchDescriptor<Memory>(
+            predicate: #Predicate { memory in
+                memory.eventId == eventId && memory.content == content
+            }
+        )
+
+        do {
+            let duplicates = try modelContext.fetch(descriptor)
+            if !duplicates.isEmpty {
+                print("⚠️ Duplicate memory detected: content '\(content)' already exists in event \(eventId)")
+                return true
+            }
+            return false
+        } catch {
+            print("❌ Error checking for duplicates: \(error)")
+            return false  // If check fails, allow the insert
+        }
+    }
+
     // MARK: - Create Memories
 
     /// Create a photo memory
-    func createPhotoMemory(userId: UUID, imageData: Data, eventId: UUID? = nil) async throws {
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - imageData: The image data
+    ///   - eventId: The event ID (REQUIRED - every memory must belong to an event)
+    func createPhotoMemory(userId: UUID, imageData: Data, eventId: UUID) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -111,6 +152,13 @@ class MemoryService {
             type: .photo
         )
 
+        // Check for duplicates BEFORE creating the memory
+        if isDuplicate(eventId: eventId, content: imageURL) {
+            print("⚠️ [Photo] Duplicate detected - skipping creation")
+            throw NSError(domain: "MemoryService", code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "This photo already exists in this event"])
+        }
+
         // Create memory record
         let memory = Memory(
             userId: userId,
@@ -127,11 +175,15 @@ class MemoryService {
         try modelContext.save()
 
         // Refresh list
-        fetchLocalMemories(userId: userId)
+        fetchLocalMemories(userId: userId, eventId: eventId)
     }
 
     /// Create a video memory
-    func createVideoMemory(userId: UUID, videoURL: URL, eventId: UUID? = nil) async throws {
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - videoURL: The video URL
+    ///   - eventId: The event ID (REQUIRED - every memory must belong to an event)
+    func createVideoMemory(userId: UUID, videoURL: URL, eventId: UUID) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -172,6 +224,13 @@ class MemoryService {
             isThumbnail: true
         )
 
+        // Check for duplicates BEFORE creating the memory
+        if isDuplicate(eventId: eventId, content: videoURLString) {
+            print("⚠️ [Video] Duplicate detected - skipping creation")
+            throw NSError(domain: "MemoryService", code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "This video already exists in this event"])
+        }
+
         // Create memory record
         let memory = Memory(
             userId: userId,
@@ -190,11 +249,15 @@ class MemoryService {
         try modelContext.save()
 
         // Refresh list
-        fetchLocalMemories(userId: userId)
+        fetchLocalMemories(userId: userId, eventId: eventId)
     }
 
     /// Create a note memory
-    func createNoteMemory(userId: UUID, noteText: String, eventId: UUID? = nil) async throws {
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - noteText: The note text
+    ///   - eventId: The event ID (REQUIRED - every memory must belong to an event)
+    func createNoteMemory(userId: UUID, noteText: String, eventId: UUID) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -207,6 +270,13 @@ class MemoryService {
         } else {
             print("❌ No active Supabase session!")
             throw NSError(domain: "MemoryService", code: 401, userInfo: [NSLocalizedDescriptionKey: "No active session. Please log in again."])
+        }
+
+        // Check for duplicates BEFORE creating the memory
+        if isDuplicate(eventId: eventId, content: noteText) {
+            print("⚠️ [Note] Duplicate detected - skipping creation")
+            throw NSError(domain: "MemoryService", code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "This note already exists in this event"])
         }
 
         // Create memory record
@@ -225,11 +295,15 @@ class MemoryService {
         try modelContext.save()
 
         // Refresh list
-        fetchLocalMemories(userId: userId)
+        fetchLocalMemories(userId: userId, eventId: eventId)
     }
 
     /// Create an audio memory
-    func createAudioMemory(userId: UUID, audioURL: URL, eventId: UUID? = nil) async throws {
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - audioURL: The audio URL
+    ///   - eventId: The event ID (REQUIRED - every memory must belong to an event)
+    func createAudioMemory(userId: UUID, audioURL: URL, eventId: UUID) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -258,6 +332,13 @@ class MemoryService {
             type: .audio
         )
 
+        // Check for duplicates BEFORE creating the memory
+        if isDuplicate(eventId: eventId, content: audioURLString) {
+            print("⚠️ [Audio] Duplicate detected - skipping creation")
+            throw NSError(domain: "MemoryService", code: 409,
+                userInfo: [NSLocalizedDescriptionKey: "This audio already exists in this event"])
+        }
+
         // Create memory record
         let memory = Memory(
             userId: userId,
@@ -275,7 +356,7 @@ class MemoryService {
         try modelContext.save()
 
         // Refresh list
-        fetchLocalMemories(userId: userId)
+        fetchLocalMemories(userId: userId, eventId: eventId)
     }
 
     // MARK: - Delete Memory
@@ -299,8 +380,9 @@ class MemoryService {
         modelContext.delete(memory)
         try modelContext.save()
 
-        // Refresh list
-        fetchLocalMemories(userId: memory.userId)
+        // Refresh list (need to pass eventId - get from memory before deletion)
+        let eventId = memory.eventId
+        fetchLocalMemories(userId: memory.userId, eventId: eventId)
     }
 
     // MARK: - Helper Methods

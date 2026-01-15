@@ -106,10 +106,15 @@ struct PastEventsView: View {
                     MemoryPlaybackView(
                         memoryService: service,
                         userId: userId,
+                        eventId: event.id,
                         eventName: event.name
                     )
                     .onAppear {
                         print("✅ [PastEventsView] Navigating to playback for past event: \(event.name)")
+                        // Load memories for this specific event
+                        Task {
+                            await service.syncMemories(userId: userId, eventId: event.id)
+                        }
                     }
                 } else {
                     Text("Error: Unable to load memories")
@@ -125,11 +130,8 @@ struct PastEventsView: View {
 
             Task {
                 await loadPastEvents()
-
-                // Load memories for the service
-                if let userId = authService.currentUserId {
-                    await memoryService?.syncMemories(userId: userId)
-                }
+                // Note: Memories will be loaded when user taps on a specific event
+                // (see onAppear in navigationDestination above)
             }
         }
     }

@@ -87,10 +87,12 @@ struct MemoriesHomeView: View {
 
                     Spacer()
 
-                    // Circular Add Memories Button (hidden for past events)
+                    // Circular Add Memories Button (hidden for past events, disabled if no active event)
                     if !isPastEvent {
                         Button(action: {
-                            showMediaTypePicker = true
+                            if activeEvent != nil {
+                                showMediaTypePicker = true
+                            }
                         }) {
                             ZStack {
                                 Circle()
@@ -109,13 +111,15 @@ struct MemoriesHomeView: View {
                                         .font(.system(size: 60))
                                         .foregroundColor(.white)
 
-                                    Text("Add Memories")
+                                    Text(activeEvent != nil ? "Add Memories" : "Start Event First")
                                         .font(.headline)
                                         .foregroundColor(.white)
                                 }
                             }
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .opacity(activeEvent != nil ? 1.0 : 0.5)
+                        .disabled(activeEvent == nil)
                     }
 
                     Spacer()
@@ -192,10 +196,12 @@ struct MemoriesHomeView: View {
             .navigationDestination(isPresented: $navigateToPlayback) {
                 Group {
                     if let service = memoryService,
-                       let userId = authService.currentUserId {
+                       let userId = authService.currentUserId,
+                       let eventId = activeEvent?.id {
                         MemoryPlaybackView(
                             memoryService: service,
                             userId: userId,
+                            eventId: eventId,
                             eventName: activeEvent?.name
                         )
                         .onAppear {
@@ -205,25 +211,46 @@ struct MemoriesHomeView: View {
                         Text("Error: Unable to load memories")
                             .foregroundColor(.red)
                             .onAppear {
-                                print("❌ Cannot navigate - service: \(memoryService != nil), userId: \(authService.currentUserId != nil)")
+                                print("❌ Cannot navigate - service: \(memoryService != nil), userId: \(authService.currentUserId != nil), eventId: \(activeEvent?.id != nil)")
                             }
                     }
                 }
             }
             .sheet(isPresented: $showMediaTypePicker, onDismiss: {
                 // Refresh memories when sheet is dismissed
-                if let userId = authService.currentUserId {
-                    memoryService?.fetchLocalMemories(userId: userId)
+                if let userId = authService.currentUserId,
+                   let eventId = activeEvent?.id {
+                    memoryService?.fetchLocalMemories(userId: userId, eventId: eventId)
                 }
             }) {
                 if let service = memoryService,
-                   let userId = authService.currentUserId {
+                   let userId = authService.currentUserId,
+                   let activeEvent = activeEvent {
                     MediaTypePickerView(
                         memoryService: service,
                         userId: userId,
-                        eventId: activeEvent?.id,
-                        eventName: activeEvent?.name
+                        eventId: activeEvent.id,
+                        eventName: activeEvent.name
                     )
+                } else {
+                    // No active event - show error message
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 60))
+                            .foregroundColor(.orange)
+                        Text("No Active Event")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("Please start an event before adding memories")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Close") {
+                            showMediaTypePicker = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
                 }
             }
         .onAppear {
@@ -247,15 +274,21 @@ struct MemoriesHomeView: View {
                     currentUser.id = realUserId
                 }
 
-                await MainActor.run {
-                    memoryService?.fetchLocalMemories(userId: realUserId)
-                }
-
-                // Sync with remote in background
-                await memoryService?.syncMemories(userId: realUserId)
-
-                // Load events
+                // Load events first to determine active event
                 await loadEvents()
+
+                // If we have an active event or selected event, fetch/sync memories for it
+                let targetEvent = selectedEvent ?? activeEvent
+                if let eventId = targetEvent?.id {
+                    await MainActor.run {
+                        memoryService?.fetchLocalMemories(userId: realUserId, eventId: eventId)
+                    }
+
+                    // Sync with remote in background
+                    await memoryService?.syncMemories(userId: realUserId, eventId: eventId)
+                } else {
+                    print("⚠️ No active or selected event - memories will not be loaded")
+                }
 
                 // If selectedEvent was provided, use it as activeEvent
                 if let selected = selectedEvent {

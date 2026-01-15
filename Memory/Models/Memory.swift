@@ -13,7 +13,7 @@ import SwiftData
 final class Memory {
     var id: UUID
     var userId: UUID
-    var eventId: UUID? // Links to an event
+    var eventId: UUID // REQUIRED: Links to an event (NOT NULL)
     var type: MemoryType
     var content: String // For notes, this is the text; for media, this is the URL
     var thumbnailURL: String? // Thumbnail for videos/images
@@ -25,7 +25,7 @@ final class Memory {
     init(
         id: UUID = UUID(),
         userId: UUID,
-        eventId: UUID? = nil,
+        eventId: UUID, // REQUIRED parameter - every memory must belong to an event
         type: MemoryType,
         content: String,
         thumbnailURL: String? = nil,
@@ -79,7 +79,7 @@ enum MemoryType: String, Codable {
 struct MemoryRecord: Codable {
     let id: UUID
     let userId: UUID
-    let eventId: UUID?
+    let eventId: UUID // REQUIRED: Every memory must have an event
     let type: String
     let content: String
     let thumbnailUrl: String?
@@ -106,7 +106,7 @@ struct MemoryRecord: Codable {
 struct MemoryInsert: Encodable {
     let id: String
     let userId: String
-    let eventId: String?
+    let eventId: String // REQUIRED: Every memory must have an event
     let type: String
     let content: String
     let thumbnailUrl: String?
@@ -132,7 +132,7 @@ struct MemoryInsert: Encodable {
         let formatter = ISO8601DateFormatter()
         self.id = memory.id.uuidString
         self.userId = memory.userId.uuidString
-        self.eventId = memory.eventId?.uuidString
+        self.eventId = memory.eventId.uuidString // Now required, not optional
         self.type = memory.type.rawValue
         self.content = memory.content
         self.thumbnailUrl = memory.thumbnailURL

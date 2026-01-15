@@ -24,7 +24,26 @@ struct MemoryApp: App {
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // Schema migration failed - this happens when Memory model changed (eventId: UUID? -> UUID)
+            // Solution: Delete the old database and create a fresh one
+            print("⚠️ [MemoryApp] ModelContainer creation failed (likely schema mismatch)")
+            print("⚠️ [MemoryApp] This is expected after making eventId non-optional")
+            print("🔄 [MemoryApp] Clearing local SwiftData cache...")
+
+            // Delete the old database files
+            let fileManager = FileManager.default
+            if let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let storeURL = appSupportURL.appendingPathComponent("default.store")
+                try? fileManager.removeItem(at: storeURL)
+                print("✅ [MemoryApp] Cleared local database - will sync fresh from Supabase")
+            }
+
+            // Try creating container again with fresh database
+            do {
+                return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            } catch {
+                fatalError("Could not create ModelContainer after clearing database: \(error)")
+            }
         }
     }()
 

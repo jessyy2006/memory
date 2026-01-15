@@ -372,18 +372,28 @@ class SupabaseManager {
 
     // MARK: - Memory Operations
 
-    /// Fetch all memories for a user
-    func fetchMemories(userId: UUID) async throws -> [MemoryRecord] {
+    /// Fetch memories for a specific event (SCOPED RETRIEVAL - prevents memory leaks)
+    /// - Parameters:
+    ///   - userId: The user ID
+    ///   - eventId: The event ID to filter by (REQUIRED for data isolation)
+    /// - Returns: Array of memories belonging to the specified event only
+    func fetchMemories(userId: UUID, eventId: UUID) async throws -> [MemoryRecord] {
+        print("🔍 [SupabaseManager] Fetching memories for user \(userId) in event \(eventId)")
+
         let response = try await client
             .from(SupabaseConfig.Tables.memories)
             .select()
             .eq("user_id", value: userId.uuidString)
+            .eq("event_id", value: eventId.uuidString)  // CRITICAL: Filter by event_id
             .order("timestamp", ascending: true)
             .execute()
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([MemoryRecord].self, from: response.data)
+        let memories = try decoder.decode([MemoryRecord].self, from: response.data)
+
+        print("✅ [SupabaseManager] Fetched \(memories.count) memories for event \(eventId)")
+        return memories
     }
 
     /// Insert a new memory

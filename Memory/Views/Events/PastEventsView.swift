@@ -160,7 +160,7 @@ struct PastEventsView: View {
 
             // Debug: Print each event's status
             for event in allEvents {
-                print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isEnded=\(event.isEnded)")
+                print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isFuture=\(event.isFuture?.description ?? "nil"), isEnded=\(event.isEnded)")
             }
 
             // Sort by date descending (most recent first)

@@ -34,7 +34,7 @@ struct EventsHomeView: View {
         let filtered = allEvents.filter { !$0.isEnded }
         print("🔍 [EventsHomeView] activeEvents filter:")
         for event in allEvents {
-            print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isEnded=\(event.isEnded)")
+            print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isFuture=\(event.isFuture?.description ?? "nil"), isEnded=\(event.isEnded)")
         }
         print("   → \(filtered.count) active events")
         return filtered
@@ -341,6 +341,8 @@ struct EventsHomeView: View {
                     print("      - Date: \(event.eventDate)")
                     print("      - is_active: \(event.isActive)")
                     print("      - is_upcoming: \(event.isUpcoming ?? false)")
+                    print("      - is_future: \(event.isFuture ?? false)")
+                    print("      - is_ended: \(event.isEnded)")
                 }
 
                 if allEvents.isEmpty {
@@ -377,6 +379,9 @@ struct EventsHomeView: View {
             print("   - ID: \(createdEvent.id)")
             print("   - Date: \(createdEvent.eventDate)")
             print("   - is_active: \(createdEvent.isActive)")
+            print("   - is_upcoming: \(createdEvent.isUpcoming ?? false)")
+            print("   - is_future: \(createdEvent.isFuture ?? false)")
+            print("   - is_ended: \(createdEvent.isEnded)")
 
             // Small delay to ensure Supabase has processed the insert
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds

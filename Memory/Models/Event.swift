@@ -75,8 +75,8 @@ extension Event {
                 return calendar.startOfDay(for: eventDate) >= calendar.startOfDay(for: now)
             }
 
-            // Event is upcoming if end time hasn't passed
-            return eventEndDateTime >= now
+            // Event is upcoming if end time hasn't passed yet (FIXED: use > instead of >=)
+            return eventEndDateTime > now
         } else {
             // No end time - use date-only comparison
             let calendar = Calendar.current

@@ -17,7 +17,7 @@
 -- ============================================================================
 
 -- ============================================================================
--- STEP 1: Drop all dependent triggers
+-- STEP 1: Drop all dependent triggers and functions
 -- ============================================================================
 
 DROP TRIGGER IF EXISTS trigger_events_is_upcoming ON events;
@@ -28,6 +28,20 @@ DROP TRIGGER IF EXISTS trigger_calculate_event_status_update ON events;
 DROP TRIGGER IF EXISTS trigger_calculate_event_status_insert ON events;
 DROP TRIGGER IF EXISTS trigger_update_most_upcoming_after_insert ON events;
 DROP TRIGGER IF EXISTS trigger_update_most_upcoming_after_delete ON events;
+DROP TRIGGER IF EXISTS trigger_auto_update_event_state ON events;
+
+-- Drop old functions that reference TIME columns
+-- These may or may not exist, but we drop them to be safe
+DROP FUNCTION IF EXISTS auto_update_event_state();
+DROP FUNCTION IF EXISTS auto_calculate_is_ended();
+DROP FUNCTION IF EXISTS auto_calculate_is_future();
+DROP FUNCTION IF EXISTS recalculate_is_upcoming(UUID);
+DROP FUNCTION IF EXISTS recalculate_upcoming_event(UUID);
+DROP FUNCTION IF EXISTS after_event_insert();
+DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming();
+DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming_on_delete();
+DROP FUNCTION IF EXISTS get_event_state(UUID, TIME, TIME, BOOLEAN);
+DROP FUNCTION IF EXISTS log_all_events_status(UUID);
 
 -- ============================================================================
 -- STEP 2: Drop dependent views

@@ -17,40 +17,54 @@
 -- ============================================================================
 
 -- ============================================================================
--- STEP 1: Drop all dependent triggers and functions
+-- STEP 1: Drop ALL triggers first (before dropping functions)
 -- ============================================================================
 
+-- Drop all possible triggers that might exist
 DROP TRIGGER IF EXISTS trigger_events_is_upcoming ON events;
 DROP TRIGGER IF EXISTS trigger_before_update_auto_calculate_is_ended ON events;
+DROP TRIGGER IF EXISTS trigger_before_insert_auto_calculate_is_ended ON events;
+DROP TRIGGER IF EXISTS trigger_after_update_auto_calculate_is_ended ON events;
 DROP TRIGGER IF EXISTS trigger_before_update_auto_calculate_is_future ON events;
+DROP TRIGGER IF EXISTS trigger_before_insert_auto_calculate_is_future ON events;
+DROP TRIGGER IF EXISTS trigger_after_update_auto_calculate_is_future ON events;
 DROP TRIGGER IF EXISTS trigger_update_most_upcoming_after_update ON events;
 DROP TRIGGER IF EXISTS trigger_calculate_event_status_update ON events;
 DROP TRIGGER IF EXISTS trigger_calculate_event_status_insert ON events;
 DROP TRIGGER IF EXISTS trigger_update_most_upcoming_after_insert ON events;
 DROP TRIGGER IF EXISTS trigger_update_most_upcoming_after_delete ON events;
 DROP TRIGGER IF EXISTS trigger_auto_update_event_state ON events;
-
--- Drop old functions that reference TIME columns
--- These may or may not exist, but we drop them to be safe
-DROP FUNCTION IF EXISTS auto_update_event_state();
-DROP FUNCTION IF EXISTS auto_calculate_is_ended();
-DROP FUNCTION IF EXISTS auto_calculate_is_future();
-DROP FUNCTION IF EXISTS recalculate_is_upcoming(UUID);
-DROP FUNCTION IF EXISTS recalculate_upcoming_event(UUID);
-DROP FUNCTION IF EXISTS after_event_insert();
-DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming();
-DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming_on_delete();
-DROP FUNCTION IF EXISTS get_event_state(UUID, TIME, TIME, BOOLEAN);
-DROP FUNCTION IF EXISTS log_all_events_status(UUID);
+DROP TRIGGER IF EXISTS trigger_recalculate_is_upcoming_on_update ON events;
+DROP TRIGGER IF EXISTS trigger_recalculate_is_upcoming_on_insert ON events;
+DROP TRIGGER IF EXISTS trigger_recalculate_is_upcoming_on_delete ON events;
+DROP TRIGGER IF EXISTS trigger_after_event_insert ON events;
+DROP TRIGGER IF EXISTS update_events_updated_at ON events;
 
 -- ============================================================================
--- STEP 2: Drop dependent views
+-- STEP 2: Drop old functions that reference TIME columns
+-- ============================================================================
+
+-- Now safe to drop functions (triggers are gone)
+-- These may or may not exist, but we drop them to be safe
+DROP FUNCTION IF EXISTS auto_update_event_state() CASCADE;
+DROP FUNCTION IF EXISTS auto_calculate_is_ended() CASCADE;
+DROP FUNCTION IF EXISTS auto_calculate_is_future() CASCADE;
+DROP FUNCTION IF EXISTS recalculate_is_upcoming(UUID) CASCADE;
+DROP FUNCTION IF EXISTS recalculate_upcoming_event(UUID) CASCADE;
+DROP FUNCTION IF EXISTS after_event_insert() CASCADE;
+DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming() CASCADE;
+DROP FUNCTION IF EXISTS trigger_recalculate_is_upcoming_on_delete() CASCADE;
+DROP FUNCTION IF EXISTS get_event_state(UUID, TIME, TIME, BOOLEAN) CASCADE;
+DROP FUNCTION IF EXISTS log_all_events_status(UUID) CASCADE;
+
+-- ============================================================================
+-- STEP 3: Drop dependent views
 -- ============================================================================
 
 DROP VIEW IF EXISTS memories_with_events;
 
 -- ============================================================================
--- STEP 3: Add new TIMESTAMPTZ columns
+-- STEP 4: Add new TIMESTAMPTZ columns
 -- ============================================================================
 
 ALTER TABLE events
@@ -58,7 +72,7 @@ ADD COLUMN start_time_utc TIMESTAMPTZ,
 ADD COLUMN end_time_utc TIMESTAMPTZ;
 
 -- ============================================================================
--- STEP 4: Migrate existing data
+-- STEP 5: Migrate existing data
 -- ============================================================================
 -- Convert existing TIME values to TIMESTAMPTZ
 -- Assume existing times are in Pacific timezone, convert to UTC
@@ -122,7 +136,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 5: Drop old TIME columns
+-- STEP 6: Drop old TIME columns
 -- ============================================================================
 
 ALTER TABLE events
@@ -130,7 +144,7 @@ DROP COLUMN start_time CASCADE,
 DROP COLUMN end_time CASCADE;
 
 -- ============================================================================
--- STEP 6: Rename new columns to original names
+-- STEP 7: Rename new columns to original names
 -- ============================================================================
 
 ALTER TABLE events
@@ -140,7 +154,7 @@ ALTER TABLE events
 RENAME COLUMN end_time_utc TO end_time;
 
 -- ============================================================================
--- STEP 7: Update calculate_event_status() to use UTC
+-- STEP 8: Update calculate_event_status() to use UTC
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION calculate_event_status()
@@ -213,7 +227,7 @@ END;
 $$;
 
 -- ============================================================================
--- STEP 8: Recreate triggers (ensure they use the updated function)
+-- STEP 9: Recreate triggers (ensure they use the updated function)
 -- ============================================================================
 
 -- Create BEFORE INSERT trigger
@@ -236,7 +250,7 @@ CREATE TRIGGER trigger_calculate_event_status_update
     EXECUTE FUNCTION calculate_event_status();
 
 -- ============================================================================
--- STEP 9: Recreate update_most_upcoming_event() function if it exists
+-- STEP 10: Recreate update_most_upcoming_event() function if it exists
 -- ============================================================================
 
 -- Check if this function exists and recreate triggers for it
@@ -267,7 +281,7 @@ CREATE TRIGGER trigger_update_most_upcoming_after_delete
     EXECUTE FUNCTION update_most_upcoming_event();
 
 -- ============================================================================
--- STEP 10: Recreate memories_with_events view
+-- STEP 11: Recreate memories_with_events view
 -- ============================================================================
 
 CREATE OR REPLACE VIEW memories_with_events AS
@@ -291,7 +305,7 @@ FROM memories m
 LEFT JOIN events e ON m.event_id = e.id;
 
 -- ============================================================================
--- STEP 11: Force recalculation for ALL existing events
+-- STEP 12: Force recalculation for ALL existing events
 -- ============================================================================
 
 DO $$
@@ -318,7 +332,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- STEP 12: Validation - Show all events with UTC times
+-- STEP 13: Validation - Show all events with UTC times
 -- ============================================================================
 
 SELECT
@@ -350,7 +364,7 @@ FROM events
 ORDER BY event_date ASC, COALESCE(start_time, '1970-01-01 00:00:00+00'::TIMESTAMPTZ) ASC;
 
 -- ============================================================================
--- STEP 13: Debug output
+-- STEP 14: Debug output
 -- ============================================================================
 
 DO $$

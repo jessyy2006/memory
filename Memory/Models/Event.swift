@@ -139,7 +139,7 @@ struct EventRecord: Codable, Hashable {
         case updatedAt = "updated_at"
     }
 
-    // Custom decoder to handle DATE and TIMESTAMPTZ formats from Supabase
+    // Custom decoder to handle DATE and TIME formats from Supabase
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -162,31 +162,31 @@ struct EventRecord: Codable, Hashable {
         }
         eventDate = date
 
-        // Decode timestamps (ISO8601 format with fractional seconds - stored in UTC)
-        let iso8601Formatter = ISO8601DateFormatter()
-        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        // Decode startTime (TIMESTAMPTZ stored in UTC, converted to user's local time)
+        // Decode startTime (TIME format: "13:54:00" or null)
+        // Use user's local timezone
         if let startTimeString = try container.decodeIfPresent(String.self, forKey: .startTime) {
-            guard let utcTime = iso8601Formatter.date(from: startTimeString) else {
-                throw DecodingError.dataCorruptedError(forKey: .startTime, in: container, debugDescription: "Invalid timestamp format: \(startTimeString)")
-            }
-            // Store as Date (Swift Date is always UTC internally, displays in local time)
-            startTime = utcTime
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            timeFormatter.timeZone = TimeZone.current
+            startTime = timeFormatter.date(from: startTimeString)
         } else {
             startTime = nil
         }
 
-        // Decode endTime (TIMESTAMPTZ stored in UTC, converted to user's local time)
+        // Decode endTime (TIME format: "15:54:00" or null)
+        // Use user's local timezone
         if let endTimeString = try container.decodeIfPresent(String.self, forKey: .endTime) {
-            guard let utcTime = iso8601Formatter.date(from: endTimeString) else {
-                throw DecodingError.dataCorruptedError(forKey: .endTime, in: container, debugDescription: "Invalid timestamp format: \(endTimeString)")
-            }
-            // Store as Date (Swift Date is always UTC internally, displays in local time)
-            endTime = utcTime
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            timeFormatter.timeZone = TimeZone.current
+            endTime = timeFormatter.date(from: endTimeString)
         } else {
             endTime = nil
         }
+
+        // Decode timestamps (ISO8601 format with fractional seconds)
+        let iso8601Formatter = ISO8601DateFormatter()
+        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         let createdAtString = try container.decode(String.self, forKey: .createdAt)
         guard let created = iso8601Formatter.date(from: createdAtString) else {
@@ -244,54 +244,15 @@ struct EventInsert: Encodable {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        // ISO8601 formatter for TIMESTAMPTZ (UTC)
-        let iso8601Formatter = ISO8601DateFormatter()
-        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm:ss"
 
         self.id = event.id.uuidString
         self.userId = event.userId.uuidString
         self.name = event.name
         self.eventDate = dateFormatter.string(from: event.eventDate)
-
-        // Convert local time to UTC for storage
-        // The user selects a time in their local timezone (e.g., 3 PM PST)
-        // We need to combine it with the event date and convert to UTC
-        if let startTime = event.startTime {
-            // Combine event date + start time in user's local timezone
-            let calendar = Calendar.current
-            let eventDay = calendar.startOfDay(for: event.eventDate)
-            let hour = calendar.component(.hour, from: startTime)
-            let minute = calendar.component(.minute, from: startTime)
-            let second = calendar.component(.second, from: startTime)
-
-            if let localDateTime = calendar.date(bySettingHour: hour, minute: minute, second: second, of: eventDay) {
-                // Convert to UTC and format as ISO8601
-                self.startTime = iso8601Formatter.string(from: localDateTime)
-            } else {
-                self.startTime = nil
-            }
-        } else {
-            self.startTime = nil
-        }
-
-        if let endTime = event.endTime {
-            // Combine event date + end time in user's local timezone
-            let calendar = Calendar.current
-            let eventDay = calendar.startOfDay(for: event.eventDate)
-            let hour = calendar.component(.hour, from: endTime)
-            let minute = calendar.component(.minute, from: endTime)
-            let second = calendar.component(.second, from: endTime)
-
-            if let localDateTime = calendar.date(bySettingHour: hour, minute: minute, second: second, of: eventDay) {
-                // Convert to UTC and format as ISO8601
-                self.endTime = iso8601Formatter.string(from: localDateTime)
-            } else {
-                self.endTime = nil
-            }
-        } else {
-            self.endTime = nil
-        }
-
+        self.startTime = event.startTime.map { timeFormatter.string(from: $0) }
+        self.endTime = event.endTime.map { timeFormatter.string(from: $0) }
         self.isActive = event.isActive
         self.isEnded = false  // New events are not ended
     }
@@ -435,24 +396,24 @@ struct MemoryWithEvent: Codable {
             eventDate = nil
         }
 
-        // Decode eventStartTime (TIMESTAMPTZ format - stored in UTC)
+        // Decode eventStartTime (TIME format: "13:54:00" or null)
+        // Use user's local timezone
         if let startTimeString = try container.decodeIfPresent(String.self, forKey: .eventStartTime) {
-            guard let utcTime = iso8601Formatter.date(from: startTimeString) else {
-                throw DecodingError.dataCorruptedError(forKey: .eventStartTime, in: container, debugDescription: "Invalid timestamp format: \(startTimeString)")
-            }
-            // Store as Date (Swift Date is always UTC internally, displays in local time)
-            eventStartTime = utcTime
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            timeFormatter.timeZone = TimeZone.current
+            eventStartTime = timeFormatter.date(from: startTimeString)
         } else {
             eventStartTime = nil
         }
 
-        // Decode eventEndTime (TIMESTAMPTZ format - stored in UTC)
+        // Decode eventEndTime (TIME format: "15:54:00" or null)
+        // Use user's local timezone
         if let endTimeString = try container.decodeIfPresent(String.self, forKey: .eventEndTime) {
-            guard let utcTime = iso8601Formatter.date(from: endTimeString) else {
-                throw DecodingError.dataCorruptedError(forKey: .eventEndTime, in: container, debugDescription: "Invalid timestamp format: \(endTimeString)")
-            }
-            // Store as Date (Swift Date is always UTC internally, displays in local time)
-            eventEndTime = utcTime
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            timeFormatter.timeZone = TimeZone.current
+            eventEndTime = timeFormatter.date(from: endTimeString)
         } else {
             eventEndTime = nil
         }

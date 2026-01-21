@@ -107,7 +107,8 @@ struct PastEventsView: View {
                         memoryService: service,
                         userId: userId,
                         eventId: event.id,
-                        eventName: event.name
+                        eventName: event.name,
+                        onPopToRoot: nil // PastEventsView doesn't need to pop to root
                     )
                     .onAppear {
                         print("✅ [PastEventsView] Navigating to playback for past event: \(event.name)")

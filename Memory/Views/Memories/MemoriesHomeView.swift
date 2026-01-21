@@ -15,18 +15,21 @@ struct MemoriesHomeView: View {
     @State private var memoryService: MemoryService?
     @State private var showMediaTypePicker = false
     @State private var navigateToPlayback = false
+    @State private var navigateToCountdown = false
 
     // Event management
     private let eventService = EventService()
     let selectedEvent: EventRecord? // Event passed from EventsHomeView
     let isPastEvent: Bool // Flag to indicate if this is a past event (disables Add/End actions)
+    let onPopToRoot: (() -> Void)? // Callback to pop to EventsHomeView
     @State private var activeEvent: EventRecord?
     @State private var upcomingEvents: [EventRecord] = []
     @State private var showEventCreation = false
 
-    init(selectedEvent: EventRecord? = nil, isPastEvent: Bool = false) {
+    init(selectedEvent: EventRecord? = nil, isPastEvent: Bool = false, onPopToRoot: (() -> Void)? = nil) {
         self.selectedEvent = selectedEvent
         self.isPastEvent = isPastEvent
+        self.onPopToRoot = onPopToRoot
     }
 
     var body: some View {
@@ -42,6 +45,7 @@ struct MemoriesHomeView: View {
             )
             .ignoresSafeArea()
 
+            ScrollView {
                 VStack(spacing: 40) {
                     // Active Event Badge
                     if let active = activeEvent {
@@ -71,6 +75,7 @@ struct MemoriesHomeView: View {
                     }
 
                     Spacer()
+                        .frame(height: 60)
 
                     // Title
                     VStack(spacing: 8) {
@@ -86,6 +91,7 @@ struct MemoriesHomeView: View {
                     }
 
                     Spacer()
+                        .frame(height: 60)
 
                     // Circular Add Memories Button (hidden for past events, disabled if no active event)
                     if !isPastEvent {
@@ -123,6 +129,7 @@ struct MemoriesHomeView: View {
                     }
 
                     Spacer()
+                        .frame(height: 60)
 
                     // Play Button
                     Button(action: {
@@ -156,6 +163,8 @@ struct MemoriesHomeView: View {
                     .padding(.bottom, 50)
                     .disabled(memoryService?.memories.isEmpty ?? true)
                     .opacity((memoryService?.memories.isEmpty ?? true) ? 0.5 : 1.0)
+                }
+                .frame(minHeight: UIScreen.main.bounds.height - 100)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -166,6 +175,13 @@ struct MemoriesHomeView: View {
                         if activeEvent != nil {
                             // Show "End Event" button when event is active
                             Button {
+                                print("🔴 [MemoriesHomeView] END EVENT BUTTON TAPPED")
+                                print("📊 Current event: \(activeEvent?.name ?? "nil")")
+                                print("📊 Event flags BEFORE stop:")
+                                print("   - isActive: \(activeEvent?.isActive ?? false)")
+                                print("   - isEnded: \(activeEvent?.isEnded ?? false)")
+                                print("   - isFuture: \(activeEvent?.isFuture ?? false)")
+                                print("   - isUpcoming: \(activeEvent?.isUpcoming ?? false)")
                                 Task {
                                     await endEventAndNavigateToPlayback()
                                 }
@@ -193,6 +209,30 @@ struct MemoriesHomeView: View {
                     onStartEvent: startEvent
                 )
             }
+            .navigationDestination(isPresented: $navigateToCountdown) {
+                Group {
+                    if let service = memoryService,
+                       let userId = authService.currentUserId,
+                       let eventId = activeEvent?.id {
+                        CountdownView(
+                            memoryService: service,
+                            userId: userId,
+                            eventId: eventId,
+                            eventName: activeEvent?.name,
+                            onPopToRoot: onPopToRoot
+                        )
+                        .onAppear {
+                            print("⏰ [MemoriesHomeView] Navigating to countdown with \(service.memories.count) memories")
+                        }
+                    } else {
+                        Text("Error: Unable to load countdown")
+                            .foregroundColor(.red)
+                            .onAppear {
+                                print("❌ Cannot navigate to countdown - service: \(memoryService != nil), userId: \(authService.currentUserId != nil), eventId: \(activeEvent?.id != nil)")
+                            }
+                    }
+                }
+            }
             .navigationDestination(isPresented: $navigateToPlayback) {
                 Group {
                     if let service = memoryService,
@@ -202,7 +242,8 @@ struct MemoriesHomeView: View {
                             memoryService: service,
                             userId: userId,
                             eventId: eventId,
-                            eventName: activeEvent?.name
+                            eventName: activeEvent?.name,
+                            onPopToRoot: onPopToRoot
                         )
                         .onAppear {
                             print("✅ Navigating to playback with \(service.memories.count) memories")
@@ -354,15 +395,57 @@ struct MemoriesHomeView: View {
 
         print("🛑 [MemoriesHomeView] Ending event: \(active.name)")
 
+        // IMPORTANT: Save the event BEFORE ending it, so we can navigate to playback
+        let endedEventId = active.id
+        let endedEventName = active.name
+
         do {
             // Stop the event
             _ = try await eventService.stopEvent(eventId: active.id)
             print("✅ [MemoriesHomeView] Event stopped successfully")
 
-            // Navigate to playback with the event name
+            // Check the updated event flags
+            print("📊 Event flags AFTER stop:")
+            if let updatedEvent = try? await eventService.fetchEvent(id: active.id) {
+                print("   - isActive: \(updatedEvent.isActive)")
+                print("   - isEnded: \(updatedEvent.isEnded)")
+                print("   - isFuture: \(updatedEvent.isFuture ?? false)")
+                print("   - isUpcoming: \(updatedEvent.isUpcoming ?? false)")
+
+                if updatedEvent.isEnded {
+                    print("✅ Event correctly marked as ENDED - should move to Past Events")
+                } else {
+                    print("❌ BUG: Event NOT marked as ended! isEnded=\(updatedEvent.isEnded)")
+                }
+            }
+
+            // Reload events to get updated flags (this will clear activeEvent since it's no longer active)
+            await loadEvents()
+
+            // Navigate to COUNTDOWN VIEW (30-second buffer before playback)
             await MainActor.run {
-                print("🎬 [MemoriesHomeView] Navigating to playback screen...")
-                navigateToPlayback = true
+                print("⏰ [MemoriesHomeView] Navigating to countdown screen...")
+                print("📊 Using saved event ID: \(endedEventId)")
+                print("📊 Using saved event name: \(endedEventName)")
+
+                // Temporarily set activeEvent for navigation purposes
+                // The CountdownView needs activeEvent to have a value
+                activeEvent = EventRecord(
+                    id: endedEventId,
+                    userId: active.userId,
+                    name: endedEventName,
+                    eventDate: active.eventDate,
+                    startTime: active.startTime,
+                    endTime: active.endTime,
+                    isActive: false,
+                    isEnded: true,
+                    isFuture: false,
+                    isUpcoming: false,
+                    createdAt: active.createdAt,
+                    updatedAt: active.updatedAt
+                )
+
+                navigateToCountdown = true
             }
         } catch {
             print("❌ [MemoriesHomeView] Failed to stop event: \(error)")

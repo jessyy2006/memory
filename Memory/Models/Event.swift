@@ -139,6 +139,35 @@ struct EventRecord: Codable, Hashable {
         case updatedAt = "updated_at"
     }
 
+    // Memberwise initializer
+    init(
+        id: UUID,
+        userId: UUID,
+        name: String,
+        eventDate: Date,
+        startTime: Date?,
+        endTime: Date?,
+        isActive: Bool,
+        isEnded: Bool,
+        isFuture: Bool?,
+        isUpcoming: Bool?,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.userId = userId
+        self.name = name
+        self.eventDate = eventDate
+        self.startTime = startTime
+        self.endTime = endTime
+        self.isActive = isActive
+        self.isEnded = isEnded
+        self.isFuture = isFuture
+        self.isUpcoming = isUpcoming
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
     // Custom decoder to handle DATE and TIME formats from Supabase
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

@@ -28,6 +28,7 @@ struct EventsHomeView: View {
     // Navigation
     @State private var navigateToMemories: EventRecord?
     @State private var navigateToPastEvents = false
+    @State private var navigationPath = NavigationPath() // Track navigation stack
 
     // Filtered events for display
     private var activeEvents: [EventRecord] {
@@ -37,7 +38,20 @@ struct EventsHomeView: View {
             print("   - \(event.name): isActive=\(event.isActive), isUpcoming=\(event.isUpcoming?.description ?? "nil"), isFuture=\(event.isFuture?.description ?? "nil"), isEnded=\(event.isEnded)")
         }
         print("   → \(filtered.count) active events")
-        return filtered
+
+        // Sort: isUpcoming=true events first, then by date
+        return filtered.sorted { event1, event2 in
+            let isUpcoming1 = event1.isUpcoming == true
+            let isUpcoming2 = event2.isUpcoming == true
+
+            // If one is upcoming and the other isn't, upcoming comes first
+            if isUpcoming1 != isUpcoming2 {
+                return isUpcoming1
+            }
+
+            // Otherwise, sort by event date (earliest first)
+            return event1.eventDate < event2.eventDate
+        }
     }
 
     private var pastEvents: [EventRecord] {
@@ -47,7 +61,7 @@ struct EventsHomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 // Background gradient
                 LinearGradient(
@@ -204,7 +218,13 @@ struct EventsHomeView: View {
                 }
             }
             .navigationDestination(item: $navigateToMemories) { event in
-                MemoriesHomeView(selectedEvent: event)
+                MemoriesHomeView(
+                    selectedEvent: event,
+                    onPopToRoot: {
+                        // Clear navigation to return to EventsHomeView
+                        navigateToMemories = nil
+                    }
+                )
             }
             .navigationDestination(isPresented: $navigateToPastEvents) {
                 PastEventsView()

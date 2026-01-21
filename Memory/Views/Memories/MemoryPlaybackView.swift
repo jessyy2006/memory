@@ -14,6 +14,7 @@ struct MemoryPlaybackView: View {
     let userId: UUID
     let eventId: UUID // Required for syncing the correct event's memories
     let eventName: String? // Optional event name
+    let onPopToRoot: (() -> Void)? // Callback to pop to EventsHomeView
 
     @State private var showDeleteConfirmation = false
     @State private var memoryToDelete: Memory?
@@ -69,10 +70,22 @@ struct MemoryPlaybackView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
-                    // Dismiss twice to go back to EventsHomeView
-                    dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    // Pop entire navigation stack to return to EventsHomeView
+                    print("🔙 [MemoryPlaybackView] Back button tapped - popping to EventsHomeView")
+
+                    if let popToRoot = onPopToRoot {
+                        // Use callback to clear navigation path
+                        popToRoot()
+                    } else {
+                        // Fallback: dismiss multiple times (should not happen with new implementation)
+                        print("⚠️ [MemoryPlaybackView] No popToRoot callback - using dismiss fallback")
                         dismiss()
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 100_000_000)
+                            dismiss()
+                            try? await Task.sleep(nanoseconds: 100_000_000)
+                            dismiss()
+                        }
                     }
                 } label: {
                     HStack(spacing: 4) {
@@ -109,7 +122,8 @@ struct MemoryPlaybackView: View {
             memoryService: MemoryService(modelContext: modelContext),
             userId: UUID(),
             eventId: UUID(),
-            eventName: "Test Event"
+            eventName: "Test Event",
+            onPopToRoot: nil
         )
     }
 }

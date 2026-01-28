@@ -257,6 +257,7 @@ struct EventInsert: Encodable {
     let endTime: String?
     let isActive: Bool
     let isEnded: Bool
+    let isFuture: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -267,6 +268,7 @@ struct EventInsert: Encodable {
         case endTime = "end_time"
         case isActive = "is_active"
         case isEnded = "is_ended"
+        case isFuture = "is_future"
     }
 
     init(event: Event) {
@@ -284,6 +286,33 @@ struct EventInsert: Encodable {
         self.endTime = event.endTime.map { timeFormatter.string(from: $0) }
         self.isActive = event.isActive
         self.isEnded = false  // New events are not ended
+
+        // CASE B FIX: Force isFuture = true for events that haven't ended yet
+        // This ensures future events are properly routed to EventsHomeView
+        let now = Date()
+        let calendar = Calendar.current
+
+        if let endTime = event.endTime {
+            // Event has end time - check if end time hasn't passed yet
+            let eventDay = calendar.startOfDay(for: event.eventDate)
+            let endHour = calendar.component(.hour, from: endTime)
+            let endMinute = calendar.component(.minute, from: endTime)
+
+            if let eventEndDateTime = calendar.date(bySettingHour: endHour, minute: endMinute, second: 0, of: eventDay) {
+                // isFuture = true if end time is in the future
+                self.isFuture = eventEndDateTime > now
+            } else {
+                // Fallback: use date-only comparison
+                let today = calendar.startOfDay(for: now)
+                let eventDay = calendar.startOfDay(for: event.eventDate)
+                self.isFuture = eventDay >= today
+            }
+        } else {
+            // No end time - use date-only comparison
+            let today = calendar.startOfDay(for: now)
+            let eventDay = calendar.startOfDay(for: event.eventDate)
+            self.isFuture = eventDay >= today
+        }
     }
 }
 
